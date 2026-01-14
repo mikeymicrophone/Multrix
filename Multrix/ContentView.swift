@@ -8,8 +8,13 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var matrixA = Matrix()
-    @State private var matrixB = Matrix()
+    // Dimensions: A is (rowsA × shared), B is (shared × colsB), Result is (rowsA × colsB)
+    @State private var rowsA: Int = 4
+    @State private var shared: Int = 4
+    @State private var colsB: Int = 4
+
+    @State private var matrixA: Matrix
+    @State private var matrixB: Matrix
     @State private var result: [[Int]]? = nil
     @State private var showingNumberInput = false
     @State private var editingMatrix: Int = 0  // 0 for A, 1 for B
@@ -17,6 +22,12 @@ struct ContentView: View {
     @State private var editingCol: Int = 0
     @State private var selectedResultRow: Int? = nil
     @State private var selectedResultCol: Int? = nil
+    @State private var showingDimensionPicker = false
+
+    init() {
+        _matrixA = State(initialValue: Matrix(rows: 4, cols: 4))
+        _matrixB = State(initialValue: Matrix(rows: 4, cols: 4))
+    }
 
     var body: some View {
         ScrollView {
@@ -32,11 +43,37 @@ struct ContentView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
 
+                // Dimension Picker Toggle
+                Button(action: { showingDimensionPicker.toggle() }) {
+                    HStack {
+                        Image(systemName: showingDimensionPicker ? "chevron.up" : "chevron.down")
+                        Text("Dimensions: A[\(rowsA)×\(shared)] × B[\(shared)×\(colsB)]")
+                        Image(systemName: "slider.horizontal.3")
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.blue)
+                }
+
+                if showingDimensionPicker {
+                    DimensionPickerView(
+                        rowsA: $rowsA,
+                        shared: $shared,
+                        colsB: $colsB
+                    ) {
+                        regenerateMatrices()
+                        showingDimensionPicker = false
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                }
+
                 // Matrix A
                 VStack(spacing: 8) {
-                    Text("Matrix A")
+                    Text("Matrix A [\(matrixA.rows)×\(matrixA.cols)]")
                         .font(.headline)
-                    MatrixView(matrix: $matrixA) { row, col in
+                    MatrixView(
+                        matrix: $matrixA,
+                        highlightedRow: selectedResultRow
+                    ) { row, col in
                         editingMatrix = 0
                         editingRow = row
                         editingCol = col
@@ -50,9 +87,12 @@ struct ContentView: View {
 
                 // Matrix B
                 VStack(spacing: 8) {
-                    Text("Matrix B")
+                    Text("Matrix B [\(matrixB.rows)×\(matrixB.cols)]")
                         .font(.headline)
-                    MatrixView(matrix: $matrixB) { row, col in
+                    MatrixView(
+                        matrix: $matrixB,
+                        highlightedCol: selectedResultCol
+                    ) { row, col in
                         editingMatrix = 1
                         editingRow = row
                         editingCol = col
@@ -99,7 +139,7 @@ struct ContentView: View {
                 // Result
                 if let result = result {
                     VStack(spacing: 8) {
-                        Text("Result")
+                        Text("Result [\(matrixA.rows)×\(matrixB.cols)]")
                             .font(.headline)
                         Text("Tap a cell to see how it was calculated")
                             .font(.caption)
@@ -154,6 +194,7 @@ struct ContentView: View {
         }
         .animation(.easeInOut, value: result != nil)
         .animation(.easeInOut, value: showingNumberInput)
+        .animation(.easeInOut, value: showingDimensionPicker)
         .animation(.easeInOut, value: selectedResultRow)
         .animation(.easeInOut, value: selectedResultCol)
     }
@@ -163,13 +204,17 @@ struct ContentView: View {
     }
 
     private func calculateResult() {
-        // Matrix multiplication: C[i][j] = sum(A[i][k] * B[k][j]) for k in 0..<4
-        var resultMatrix: [[Int]] = Array(repeating: Array(repeating: 0, count: 4), count: 4)
+        // Matrix multiplication: C[i][j] = sum(A[i][k] * B[k][j]) for k in 0..<shared
+        let resultRows = matrixA.rows
+        let resultCols = matrixB.cols
+        let sharedDim = matrixA.cols
 
-        for i in 0..<4 {
-            for j in 0..<4 {
+        var resultMatrix: [[Int]] = Array(repeating: Array(repeating: 0, count: resultCols), count: resultRows)
+
+        for i in 0..<resultRows {
+            for j in 0..<resultCols {
                 var sum = 0
-                for k in 0..<4 {
+                for k in 0..<sharedDim {
                     let a = matrixA.values[i][k] ?? 0
                     let b = matrixB.values[k][j] ?? 0
                     sum += a * b
@@ -181,9 +226,17 @@ struct ContentView: View {
         result = resultMatrix
     }
 
+    private func regenerateMatrices() {
+        matrixA = Matrix(rows: rowsA, cols: shared)
+        matrixB = Matrix(rows: shared, cols: colsB)
+        result = nil
+        selectedResultRow = nil
+        selectedResultCol = nil
+    }
+
     private func reset() {
-        matrixA = Matrix()
-        matrixB = Matrix()
+        matrixA = Matrix(rows: rowsA, cols: shared)
+        matrixB = Matrix(rows: shared, cols: colsB)
         result = nil
         selectedResultRow = nil
         selectedResultCol = nil

@@ -13,11 +13,14 @@ struct ResultMatrixView: View {
     let selectedCol: Int?
     let onCellTap: (Int, Int) -> Void
 
+    private var rows: Int { values.count }
+    private var cols: Int { values.first?.count ?? 0 }
+
     var body: some View {
         VStack(spacing: 4) {
-            ForEach(0..<4, id: \.self) { row in
+            ForEach(0..<rows, id: \.self) { row in
                 HStack(spacing: 4) {
-                    ForEach(0..<4, id: \.self) { col in
+                    ForEach(0..<cols, id: \.self) { col in
                         let isSelected = row == selectedRow && col == selectedCol
                         ZStack {
                             RoundedRectangle(cornerRadius: 6)
@@ -48,10 +51,8 @@ struct ResultMatrixView: View {
 #Preview {
     ResultMatrixView(
         values: [
-            [10, 20, 30, 40],
-            [50, 60, 70, 80],
-            [90, 100, 110, 120],
-            [130, 140, 150, 160]
+            [10, 20, 30],
+            [50, 60, 70]
         ],
         selectedRow: 1,
         selectedCol: 2,

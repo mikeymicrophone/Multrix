@@ -9,16 +9,20 @@ import SwiftUI
 
 struct MatrixView: View {
     @Binding var matrix: Matrix
+    var highlightedRow: Int? = nil
+    var highlightedCol: Int? = nil
     let onCellTap: (Int, Int) -> Void
 
     var body: some View {
         VStack(spacing: 4) {
-            ForEach(0..<4, id: \.self) { row in
+            ForEach(0..<matrix.rows, id: \.self) { row in
                 HStack(spacing: 4) {
-                    ForEach(0..<4, id: \.self) { col in
+                    ForEach(0..<matrix.cols, id: \.self) { col in
+                        let isHighlighted = (highlightedRow == row) || (highlightedCol == col)
                         MatrixCellView(
                             value: matrix.values[row][col],
-                            isEditable: row == matrix.missingRow && col == matrix.missingCol
+                            isEditable: row == matrix.missingRow && col == matrix.missingCol,
+                            isHighlighted: isHighlighted
                         ) {
                             onCellTap(row, col)
                         }
@@ -35,8 +39,10 @@ struct MatrixView: View {
 }
 
 #Preview {
-    @Previewable @State var matrix = Matrix()
-    MatrixView(matrix: $matrix) { row, col in
-        print("Tapped \(row), \(col)")
+    @Previewable @State var matrix = Matrix(rows: 3, cols: 4)
+    VStack {
+        MatrixView(matrix: $matrix, highlightedRow: 1) { row, col in
+            print("Tapped \(row), \(col)")
+        }
     }
 }

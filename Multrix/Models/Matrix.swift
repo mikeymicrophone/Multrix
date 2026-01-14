@@ -9,24 +9,29 @@ import Foundation
 
 struct Matrix: Identifiable {
     let id = UUID()
-    var values: [[Int?]]  // 4x4 grid, nil represents the empty cell
+    var values: [[Int?]]
     var missingRow: Int
     var missingCol: Int
+    let rows: Int
+    let cols: Int
 
-    init() {
-        // Generate random 4x4 matrix with one missing cell
+    init(rows: Int, cols: Int) {
+        self.rows = rows
+        self.cols = cols
+
+        // Generate random matrix with one missing cell
         var grid: [[Int?]] = []
-        for _ in 0..<4 {
+        for _ in 0..<rows {
             var row: [Int?] = []
-            for _ in 0..<4 {
+            for _ in 0..<cols {
                 row.append(Int.random(in: 0...9))
             }
             grid.append(row)
         }
 
         // Pick a random cell to be empty
-        missingRow = Int.random(in: 0..<4)
-        missingCol = Int.random(in: 0..<4)
+        missingRow = Int.random(in: 0..<rows)
+        missingCol = Int.random(in: 0..<cols)
         grid[missingRow][missingCol] = nil
 
         values = grid

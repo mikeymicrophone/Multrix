@@ -7,174 +7,6 @@
 
 import SwiftUI
 
-// MARK: - Matrix Model
-
-struct Matrix: Identifiable {
-    let id = UUID()
-    var values: [[Int?]]  // 4x4 grid, nil represents the empty cell
-    var missingRow: Int
-    var missingCol: Int
-
-    init() {
-        // Generate random 4x4 matrix with one missing cell
-        var grid: [[Int?]] = []
-        for _ in 0..<4 {
-            var row: [Int?] = []
-            for _ in 0..<4 {
-                row.append(Int.random(in: 1...9))
-            }
-            grid.append(row)
-        }
-
-        // Pick a random cell to be empty
-        missingRow = Int.random(in: 0..<4)
-        missingCol = Int.random(in: 0..<4)
-        grid[missingRow][missingCol] = nil
-
-        values = grid
-    }
-
-    var isComplete: Bool {
-        values[missingRow][missingCol] != nil
-    }
-}
-
-// MARK: - Matrix Cell View
-
-struct MatrixCellView: View {
-    let value: Int?
-    let isEditable: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isEditable ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
-                .stroke(isEditable ? Color.blue : Color.gray.opacity(0.3), lineWidth: isEditable ? 2 : 1)
-
-            if let val = value {
-                Text("\(val)")
-                    .font(.title2)
-                    .fontWeight(.medium)
-            } else {
-                Text("?")
-                    .font(.title2)
-                    .fontWeight(.medium)
-                    .foregroundColor(.blue)
-            }
-        }
-        .frame(width: 50, height: 50)
-        .onTapGesture {
-            if isEditable {
-                onTap()
-            }
-        }
-    }
-}
-
-// MARK: - Matrix View
-
-struct MatrixView: View {
-    @Binding var matrix: Matrix
-    let onCellTap: (Int, Int) -> Void
-
-    var body: some View {
-        VStack(spacing: 4) {
-            ForEach(0..<4, id: \.self) { row in
-                HStack(spacing: 4) {
-                    ForEach(0..<4, id: \.self) { col in
-                        MatrixCellView(
-                            value: matrix.values[row][col],
-                            isEditable: row == matrix.missingRow && col == matrix.missingCol
-                        ) {
-                            onCellTap(row, col)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-        )
-    }
-}
-
-// MARK: - Result Matrix View
-
-struct ResultMatrixView: View {
-    let values: [[Int]]
-
-    var body: some View {
-        VStack(spacing: 4) {
-            ForEach(0..<4, id: \.self) { row in
-                HStack(spacing: 4) {
-                    ForEach(0..<4, id: \.self) { col in
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color.green.opacity(0.1))
-                                .stroke(Color.green.opacity(0.3), lineWidth: 1)
-
-                            Text("\(values[row][col])")
-                                .font(.system(size: 14))
-                                .fontWeight(.medium)
-                                .minimumScaleFactor(0.5)
-                        }
-                        .frame(width: 50, height: 50)
-                    }
-                }
-            }
-        }
-        .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.green.opacity(0.5), lineWidth: 2)
-        )
-    }
-}
-
-// MARK: - Number Input View
-
-struct NumberInputView: View {
-    @Binding var isPresented: Bool
-    let onNumberSelected: (Int) -> Void
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Text("Enter a number")
-                .font(.headline)
-
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(60)), count: 3), spacing: 12) {
-                ForEach(1...9, id: \.self) { number in
-                    Button(action: {
-                        onNumberSelected(number)
-                        isPresented = false
-                    }) {
-                        Text("\(number)")
-                            .font(.title)
-                            .frame(width: 60, height: 60)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                    }
-                }
-            }
-
-            Button("Cancel") {
-                isPresented = false
-            }
-            .padding(.top, 8)
-        }
-        .padding(24)
-        .background(Color(.systemBackground))
-        .cornerRadius(20)
-        .shadow(radius: 20)
-    }
-}
-
-// MARK: - Content View
-
 struct ContentView: View {
     @State private var matrixA = Matrix()
     @State private var matrixB = Matrix()
@@ -183,6 +15,8 @@ struct ContentView: View {
     @State private var editingMatrix: Int = 0  // 0 for A, 1 for B
     @State private var editingRow: Int = 0
     @State private var editingCol: Int = 0
+    @State private var selectedResultRow: Int? = nil
+    @State private var selectedResultCol: Int? = nil
 
     var body: some View {
         ScrollView {
@@ -248,12 +82,42 @@ struct ContentView: View {
                         .foregroundColor(.orange)
                 }
 
+                // Calculation Breakdown
+                if let result = result,
+                   let selectedRow = selectedResultRow,
+                   let selectedCol = selectedResultCol {
+                    CalculationBreakdownView(
+                        matrixA: matrixA,
+                        matrixB: matrixB,
+                        resultRow: selectedRow,
+                        resultCol: selectedCol,
+                        resultValue: result[selectedRow][selectedCol]
+                    )
+                    .transition(.scale.combined(with: .opacity))
+                }
+
                 // Result
                 if let result = result {
                     VStack(spacing: 8) {
                         Text("Result")
                             .font(.headline)
-                        ResultMatrixView(values: result)
+                        Text("Tap a cell to see how it was calculated")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        ResultMatrixView(
+                            values: result,
+                            selectedRow: selectedResultRow,
+                            selectedCol: selectedResultCol
+                        ) { row, col in
+                            if selectedResultRow == row && selectedResultCol == col {
+                                // Deselect if tapping same cell
+                                selectedResultRow = nil
+                                selectedResultCol = nil
+                            } else {
+                                selectedResultRow = row
+                                selectedResultCol = col
+                            }
+                        }
                     }
                     .transition(.scale.combined(with: .opacity))
                 }
@@ -290,6 +154,8 @@ struct ContentView: View {
         }
         .animation(.easeInOut, value: result != nil)
         .animation(.easeInOut, value: showingNumberInput)
+        .animation(.easeInOut, value: selectedResultRow)
+        .animation(.easeInOut, value: selectedResultCol)
     }
 
     private var canCalculate: Bool {
@@ -319,6 +185,8 @@ struct ContentView: View {
         matrixA = Matrix()
         matrixB = Matrix()
         result = nil
+        selectedResultRow = nil
+        selectedResultCol = nil
     }
 }
 

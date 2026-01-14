@@ -1,0 +1,60 @@
+//
+//  ResultMatrixView.swift
+//  Multrix
+//
+//  Created by Mike Schwab on 1/13/26.
+//
+
+import SwiftUI
+
+struct ResultMatrixView: View {
+    let values: [[Int]]
+    let selectedRow: Int?
+    let selectedCol: Int?
+    let onCellTap: (Int, Int) -> Void
+
+    var body: some View {
+        VStack(spacing: 4) {
+            ForEach(0..<4, id: \.self) { row in
+                HStack(spacing: 4) {
+                    ForEach(0..<4, id: \.self) { col in
+                        let isSelected = row == selectedRow && col == selectedCol
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(isSelected ? Color.orange.opacity(0.3) : Color.green.opacity(0.1))
+                                .stroke(isSelected ? Color.orange : Color.green.opacity(0.3), lineWidth: isSelected ? 2 : 1)
+
+                            Text("\(values[row][col])")
+                                .font(.system(size: 14))
+                                .fontWeight(.medium)
+                                .minimumScaleFactor(0.5)
+                        }
+                        .frame(width: 50, height: 50)
+                        .onTapGesture {
+                            onCellTap(row, col)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.green.opacity(0.5), lineWidth: 2)
+        )
+    }
+}
+
+#Preview {
+    ResultMatrixView(
+        values: [
+            [10, 20, 30, 40],
+            [50, 60, 70, 80],
+            [90, 100, 110, 120],
+            [130, 140, 150, 160]
+        ],
+        selectedRow: 1,
+        selectedCol: 2,
+        onCellTap: { _, _ in }
+    )
+}

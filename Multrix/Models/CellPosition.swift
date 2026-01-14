@@ -34,3 +34,24 @@ struct CellPositionPreferenceKey: PreferenceKey {
 enum MatrixCoordinateSpace {
     static let name = "matrixSpace"
 }
+
+// Result matrix cell identification
+struct ResultCellIdentifier: Hashable {
+    let row: Int
+    let col: Int
+}
+
+// Position data for a result cell
+struct ResultCellPositionData: Equatable {
+    let id: ResultCellIdentifier
+    let frame: CGRect
+}
+
+// PreferenceKey to collect result cell positions
+struct ResultCellPositionPreferenceKey: PreferenceKey {
+    static var defaultValue: [ResultCellPositionData] = []
+
+    static func reduce(value: inout [ResultCellPositionData], nextValue: () -> [ResultCellPositionData]) {
+        value.append(contentsOf: nextValue())
+    }
+}

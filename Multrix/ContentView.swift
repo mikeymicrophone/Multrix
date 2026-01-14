@@ -30,6 +30,7 @@ struct ContentView: View {
     @State private var showingAnimation = false
     @State private var animationRunId = UUID()
     @State private var cellPositions: [CellPositionData] = []
+    @State private var resultCellPositions: [ResultCellPositionData] = []
     @State private var animationTargetArea: CGRect = .zero
 
     init() {
@@ -210,18 +211,25 @@ struct ContentView: View {
                 .onPreferenceChange(CellPositionPreferenceKey.self) { positions in
                     cellPositions = positions
                 }
+                .onPreferenceChange(ResultCellPositionPreferenceKey.self) { positions in
+                    resultCellPositions = positions
+                }
 
                 // Animation overlay
                 if showingAnimation,
                    let selectedRow = selectedResultRow,
                    let selectedCol = selectedResultCol,
                    let result = result {
+                    let resultCellFrame = resultCellPositions.first {
+                        $0.id.row == selectedRow && $0.id.col == selectedCol
+                    }?.frame
                     MultiplicationAnimationOverlay(
                         cellPositions: cellPositions,
                         targetArea: animationTargetArea,
                         selectedRow: selectedRow,
                         selectedCol: selectedCol,
-                        finalSum: result[selectedRow][selectedCol]
+                        finalSum: result[selectedRow][selectedCol],
+                        resultCellFrame: resultCellFrame
                     )
                     .id(animationRunId)
                     .allowsHitTesting(false)

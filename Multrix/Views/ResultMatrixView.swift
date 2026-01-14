@@ -36,6 +36,19 @@ struct ResultMatrixView: View {
                         .onTapGesture {
                             onCellTap(row, col)
                         }
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: ResultCellPositionPreferenceKey.self,
+                                    value: isSelected ? [
+                                        ResultCellPositionData(
+                                            id: ResultCellIdentifier(row: row, col: col),
+                                            frame: geo.frame(in: .named(MatrixCoordinateSpace.name))
+                                        )
+                                    ] : []
+                                )
+                            }
+                        )
                     }
                 }
             }

@@ -17,6 +17,7 @@ enum AnimationPhase: Int, CaseIterable, Equatable {
     case multiply        // Show products sequentially
     case collapse        // Products collapse
     case sum             // Final sum appears
+    case flyToResult     // Sum flies to result cell
     case complete
 
     var description: String {
@@ -28,6 +29,7 @@ enum AnimationPhase: Int, CaseIterable, Equatable {
         case .multiply: return "Multiplying"
         case .collapse: return "Combining"
         case .sum: return "Result"
+        case .flyToResult: return "Placing"
         case .complete: return "Complete"
         }
     }
@@ -56,6 +58,8 @@ struct AnimationTiming {
 
     var sumDuration: Double = 0.3
     var sumDelay: Double = 0.2
+    var flyToResultDuration: Double = 0.35
+    var flyToResultDelay: Double = 0.2
 }
 
 // MARK: - Animated Cell Data
@@ -75,6 +79,7 @@ struct MultiplicationAnimationOverlay: View {
     let selectedRow: Int
     let selectedCol: Int
     let finalSum: Int
+    let resultCellFrame: CGRect?
 
     @State private var phase: AnimationPhase = .ready
     @State private var visibleProductCount: Int = 0  // How many products are visible (for sequential reveal)
@@ -116,6 +121,13 @@ struct MultiplicationAnimationOverlay: View {
     // Animation area center
     private var animationCenter: CGPoint {
         CGPoint(x: targetArea.midX, y: targetArea.midY)
+    }
+
+    private var resultCellCenter: CGPoint {
+        if let frame = resultCellFrame {
+            return CGPoint(x: frame.midX, y: frame.midY)
+        }
+        return animationCenter
     }
 
     var body: some View {
@@ -177,7 +189,7 @@ struct MultiplicationAnimationOverlay: View {
         case .ready:
             // Start at original position in the matrix
             return CGPoint(x: cell.originalFrame.midX, y: cell.originalFrame.midY)
-        case .flyOut, .align, .pair, .multiply, .collapse, .sum, .complete:
+        case .flyOut, .align, .pair, .multiply, .collapse, .sum, .flyToResult, .complete:
             // Each cell flies directly to its final vertical position
             // The pivot effect comes from the group going from horizontal to vertical
             return finalPosition
@@ -191,7 +203,7 @@ struct MultiplicationAnimationOverlay: View {
         case .multiply:
             // Fade out as product is revealed
             return index < visibleProductCount ? 0.0 : 1.0
-        case .collapse, .sum, .complete:
+        case .collapse, .sum, .flyToResult, .complete:
             return 0.0
         }
     }
@@ -214,7 +226,7 @@ struct MultiplicationAnimationOverlay: View {
         switch phase {
         case .ready:
             return CGPoint(x: cell.originalFrame.midX, y: cell.originalFrame.midY)
-        case .flyOut, .align, .pair, .multiply, .collapse, .sum, .complete:
+        case .flyOut, .align, .pair, .multiply, .collapse, .sum, .flyToResult, .complete:
             // Align vertically on the right
             return CGPoint(x: animationCenter.x + 50, y: animationCenter.y + verticalOffset)
         }
@@ -227,7 +239,7 @@ struct MultiplicationAnimationOverlay: View {
         case .multiply:
             // Fade out as product is revealed
             return index < visibleProductCount ? 0.0 : 1.0
-        case .collapse, .sum, .complete:
+        case .collapse, .sum, .flyToResult, .complete:
             return 0.0
         }
     }
@@ -280,6 +292,8 @@ struct MultiplicationAnimationOverlay: View {
                 }
             case .sum, .complete:
                 return CGPoint(x: animationCenter.x, y: animationCenter.y)
+            case .flyToResult:
+                return resultCellCenter
             default:
                 return CGPoint(x: animationCenter.x, y: animationCenter.y + normalOffset)
             }
@@ -312,6 +326,8 @@ struct MultiplicationAnimationOverlay: View {
                     return 1.0
                 }
             case .sum, .complete:
+                return 0.0
+            case .flyToResult:
                 return 0.0
             default:
                 return 0.0
@@ -371,6 +387,8 @@ struct MultiplicationAnimationOverlay: View {
                 return firstProductPosition
             case .complete:
                 return animationCenter
+            case .flyToResult:
+                return resultCellCenter
             default:
                 return firstProductPosition
             }
@@ -378,7 +396,7 @@ struct MultiplicationAnimationOverlay: View {
 
         let opacity: Double = {
             switch phase {
-            case .sum, .complete:
+            case .sum, .complete, .flyToResult:
                 return 1.0
             default:
                 return 0.0
@@ -391,6 +409,8 @@ struct MultiplicationAnimationOverlay: View {
                 return 1.3
             case .complete:
                 return 1.0
+            case .flyToResult:
+                return 0.65
             default:
                 return 0.8
             }
@@ -486,6 +506,12 @@ struct MultiplicationAnimationOverlay: View {
         withAnimation(.easeInOut(duration: 0.2).delay(totalDelay)) {
             phase = .complete
         }
+        totalDelay += 0.2 + timing.flyToResultDelay
+
+        // Phase 8: Fly to result cell
+        withAnimation(.easeInOut(duration: timing.flyToResultDuration).delay(totalDelay)) {
+            phase = .flyToResult
+        }
     }
 
 }
@@ -505,7 +531,8 @@ struct MultiplicationAnimationOverlay: View {
             targetArea: CGRect(x: 300, y: 100, width: 200, height: 300),
             selectedRow: 0,
             selectedCol: 0,
-            finalSum: 23
+            finalSum: 23,
+            resultCellFrame: CGRect(x: 100, y: 400, width: 50, height: 50)
         )
     }
 }

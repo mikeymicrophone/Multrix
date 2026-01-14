@@ -80,6 +80,8 @@ struct MultiplicationAnimationOverlay: View {
     let selectedCol: Int
     let finalSum: Int
     let resultCellFrame: CGRect?
+    let onResultPlaced: ((CGRect, Int) -> Void)?
+    let onAnimationFinished: (() -> Void)?
 
     @State private var phase: AnimationPhase = .ready
     @State private var visibleProductCount: Int = 0  // How many products are visible (for sequential reveal)
@@ -509,8 +511,20 @@ struct MultiplicationAnimationOverlay: View {
         totalDelay += 0.2 + timing.flyToResultDelay
 
         // Phase 8: Fly to result cell
+        let flyToResultStart = totalDelay
         withAnimation(.easeInOut(duration: timing.flyToResultDuration).delay(totalDelay)) {
             phase = .flyToResult
+        }
+        if let frame = resultCellFrame {
+            DispatchQueue.main.asyncAfter(deadline: .now() + flyToResultStart) {
+                onResultPlaced?(frame, finalSum)
+            }
+        }
+        let finishDelay = flyToResultStart + timing.flyToResultDuration
+        if let onAnimationFinished {
+            DispatchQueue.main.asyncAfter(deadline: .now() + finishDelay) {
+                onAnimationFinished()
+            }
         }
     }
 
@@ -532,7 +546,9 @@ struct MultiplicationAnimationOverlay: View {
             selectedRow: 0,
             selectedCol: 0,
             finalSum: 23,
-            resultCellFrame: CGRect(x: 100, y: 400, width: 50, height: 50)
+            resultCellFrame: CGRect(x: 100, y: 400, width: 50, height: 50),
+            onResultPlaced: nil,
+            onAnimationFinished: nil
         )
     }
 }

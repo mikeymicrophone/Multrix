@@ -29,6 +29,11 @@ struct ContentView: View {
     // Animation state
     @State private var showingAnimation = false
     @State private var animationRunId = UUID()
+    @State private var animationSelectedRow: Int? = nil
+    @State private var animationSelectedCol: Int? = nil
+    @State private var animationResultValue: Int? = nil
+    @State private var animationResultCellFrame: CGRect? = nil
+    @State private var resultStamps: [ResultCellIdentifier: ResultStamp] = [:]
     @State private var cellPositions: [CellPositionData] = []
     @State private var resultCellPositions: [ResultCellPositionData] = []
     @State private var animationTargetArea: CGRect = .zero
@@ -164,6 +169,12 @@ struct ContentView: View {
                                 resultCol: selectedCol,
                                 resultValue: result[selectedRow][selectedCol],
                                 onAnimateTapped: {
+                                    animationSelectedRow = selectedRow
+                                    animationSelectedCol = selectedCol
+                                    animationResultValue = result[selectedRow][selectedCol]
+                                    animationResultCellFrame = resultCellPositions.first {
+                                        $0.id.row == selectedRow && $0.id.col == selectedCol
+                                    }?.frame
                                     animationRunId = UUID()
                                     showingAnimation = true
                                 }
@@ -222,22 +233,36 @@ struct ContentView: View {
 
                 // Animation overlay
                 if showingAnimation,
-                   let selectedRow = selectedResultRow,
-                   let selectedCol = selectedResultCol,
-                   let result = result {
-                    let resultCellFrame = resultCellPositions.first {
-                        $0.id.row == selectedRow && $0.id.col == selectedCol
-                    }?.frame
+                   let selectedRow = animationSelectedRow,
+                   let selectedCol = animationSelectedCol,
+                   let finalSum = animationResultValue {
                     MultiplicationAnimationOverlay(
                         cellPositions: cellPositions,
                         targetArea: animationTargetArea,
                         selectedRow: selectedRow,
                         selectedCol: selectedCol,
-                        finalSum: result[selectedRow][selectedCol],
-                        resultCellFrame: resultCellFrame
+                        finalSum: finalSum,
+                        resultCellFrame: animationResultCellFrame,
+                        onResultPlaced: { frame, value in
+                            let id = ResultCellIdentifier(row: selectedRow, col: selectedCol)
+                            resultStamps[id] = ResultStamp(id: id, frame: frame, value: value)
+                        },
+                        onAnimationFinished: {
+                            showingAnimation = false
+                        }
                     )
                     .id(animationRunId)
                     .allowsHitTesting(false)
+                }
+
+                ForEach(resultStamps.values.sorted(by: { lhs, rhs in
+                    if lhs.id.row != rhs.id.row {
+                        return lhs.id.row < rhs.id.row
+                    }
+                    return lhs.id.col < rhs.id.col
+                })) { stamp in
+                    resultStampView(stamp)
+                        .allowsHitTesting(false)
                 }
 
                 // Number input overlay
@@ -339,6 +364,7 @@ struct ContentView: View {
         result = nil
         selectedResultRow = nil
         selectedResultCol = nil
+        resultStamps = [:]
     }
 
     private func reset() {
@@ -347,6 +373,23 @@ struct ContentView: View {
         result = nil
         selectedResultRow = nil
         selectedResultCol = nil
+        resultStamps = [:]
+    }
+
+    private func resultStampView(_ stamp: ResultStamp) -> some View {
+        Text("\(stamp.value)")
+            .font(.system(size: 16, weight: .bold, design: .rounded))
+            .foregroundColor(.white)
+            .frame(width: 50, height: 50)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.green.opacity(0.9)))
+            .scaleEffect(0.9)
+            .position(x: stamp.frame.midX, y: stamp.frame.midY)
+    }
+
+    private struct ResultStamp: Identifiable {
+        let id: ResultCellIdentifier
+        let frame: CGRect
+        let value: Int
     }
 }
 

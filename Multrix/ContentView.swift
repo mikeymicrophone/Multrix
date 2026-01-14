@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     // Dimensions: A is (rowsA × shared), B is (shared × colsB), Result is (rowsA × colsB)
     @State private var rowsA: Int = 4
     @State private var shared: Int = 4
@@ -66,38 +68,23 @@ struct ContentView: View {
                     .transition(.scale.combined(with: .opacity))
                 }
 
-                // Matrix A
-                VStack(spacing: 8) {
-                    Text("Matrix A [\(matrixA.rows)×\(matrixA.cols)]")
-                        .font(.headline)
-                    MatrixView(
-                        matrix: $matrixA,
-                        highlightedRow: selectedResultRow
-                    ) { row, col in
-                        editingMatrix = 0
-                        editingRow = row
-                        editingCol = col
-                        showingNumberInput = true
+                // Input Matrices
+                if horizontalSizeClass == .regular {
+                    // iPad: side by side
+                    HStack(alignment: .center, spacing: 24) {
+                        matrixAView
+                        Text("×")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                        matrixBView
                     }
-                }
-
-                Text("×")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-
-                // Matrix B
-                VStack(spacing: 8) {
-                    Text("Matrix B [\(matrixB.rows)×\(matrixB.cols)]")
-                        .font(.headline)
-                    MatrixView(
-                        matrix: $matrixB,
-                        highlightedCol: selectedResultCol
-                    ) { row, col in
-                        editingMatrix = 1
-                        editingRow = row
-                        editingCol = col
-                        showingNumberInput = true
-                    }
+                } else {
+                    // iPhone: stacked
+                    matrixAView
+                    Text("×")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    matrixBView
                 }
 
                 // Calculate Button
@@ -201,6 +188,38 @@ struct ContentView: View {
         .animation(.easeInOut, value: showingDimensionPicker)
         .animation(.easeInOut, value: selectedResultRow)
         .animation(.easeInOut, value: selectedResultCol)
+    }
+
+    private var matrixAView: some View {
+        VStack(spacing: 8) {
+            Text("Matrix A [\(matrixA.rows)×\(matrixA.cols)]")
+                .font(.headline)
+            MatrixView(
+                matrix: $matrixA,
+                highlightedRow: selectedResultRow
+            ) { row, col in
+                editingMatrix = 0
+                editingRow = row
+                editingCol = col
+                showingNumberInput = true
+            }
+        }
+    }
+
+    private var matrixBView: some View {
+        VStack(spacing: 8) {
+            Text("Matrix B [\(matrixB.rows)×\(matrixB.cols)]")
+                .font(.headline)
+            MatrixView(
+                matrix: $matrixB,
+                highlightedCol: selectedResultCol
+            ) { row, col in
+                editingMatrix = 1
+                editingRow = row
+                editingCol = col
+                showingNumberInput = true
+            }
+        }
     }
 
     private var canCalculate: Bool {

@@ -214,12 +214,6 @@ struct ContentView: View {
                    let selectedRow = selectedResultRow,
                    let selectedCol = selectedResultCol,
                    let result = result {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            showingAnimation = false
-                        }
-
                     MultiplicationAnimationOverlay(
                         cellPositions: cellPositions,
                         targetArea: animationTargetArea,

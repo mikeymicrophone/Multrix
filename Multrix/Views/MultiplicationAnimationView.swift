@@ -14,7 +14,7 @@ enum AnimationPhase: Int, CaseIterable, Equatable {
     case flyOut          // Cells fly to animation area
     case align           // Row and column align vertically
     case pair            // Values pair up with × symbols
-    case multiply        // Show products
+    case multiply        // Show products sequentially
     case collapse        // Products collapse
     case sum             // Final sum appears
     case complete
@@ -46,11 +46,12 @@ struct AnimationTiming {
     var pairDuration: Double = 0.4
     var pairDelay: Double = 0.2
 
-    var multiplyDuration: Double = 0.3
-    var multiplyDelay: Double = 0.3
+    // Per-product timing (sequential)
+    var productRevealDuration: Double = 0.3
+    var productRevealDelay: Double = 0.5  // Delay between each product
 
     var collapseDuration: Double = 0.4
-    var collapseDelay: Double = 0.2
+    var collapseDelay: Double = 0.4
 
     var sumDuration: Double = 0.3
     var sumDelay: Double = 0.2
@@ -76,6 +77,7 @@ struct MultiplicationAnimationOverlay: View {
     let onComplete: () -> Void
 
     @State private var phase: AnimationPhase = .ready
+    @State private var visibleProductCount: Int = 0  // How many products are visible (for sequential reveal)
     @State private var timing = AnimationTiming()
 
     // Separate the cells into row (from A) and column (from B)
@@ -127,7 +129,7 @@ struct MultiplicationAnimationOverlay: View {
             }
 
             // Plus signs between products
-            ForEach(0..<(count - 1), id: \.self) { index in
+            ForEach(0..<max(0, count - 1), id: \.self) { index in
                 plusSign(index: index)
             }
 
@@ -176,7 +178,7 @@ struct MultiplicationAnimationOverlay: View {
 
     private func animatedRowCell(cell: AnimatedCellData, index: Int) -> some View {
         let position = rowCellPosition(cell: cell, index: index)
-        let opacity = rowCellOpacity
+        let opacity = rowCellOpacity(index: index)
 
         return cellView(value: cell.value, color: cell.color)
             .position(position)
@@ -199,11 +201,14 @@ struct MultiplicationAnimationOverlay: View {
         }
     }
 
-    private var rowCellOpacity: Double {
+    private func rowCellOpacity(index: Int) -> Double {
         switch phase {
         case .ready, .flyOut, .align, .pair:
             return 1.0
-        case .multiply, .collapse, .sum, .complete:
+        case .multiply:
+            // Fade out as product is revealed
+            return index < visibleProductCount ? 0.0 : 1.0
+        case .collapse, .sum, .complete:
             return 0.0
         }
     }
@@ -212,7 +217,7 @@ struct MultiplicationAnimationOverlay: View {
 
     private func animatedColCell(cell: AnimatedCellData, index: Int) -> some View {
         let position = colCellPosition(cell: cell, index: index)
-        let opacity = colCellOpacity
+        let opacity = colCellOpacity(index: index)
 
         return cellView(value: cell.value, color: cell.color)
             .position(position)
@@ -226,20 +231,20 @@ struct MultiplicationAnimationOverlay: View {
         switch phase {
         case .ready:
             return CGPoint(x: cell.originalFrame.midX, y: cell.originalFrame.midY)
-        case .flyOut:
-            // Fly to animation area
-            return CGPoint(x: animationCenter.x + 60, y: animationCenter.y + verticalOffset)
-        case .align, .pair, .multiply, .collapse, .sum, .complete:
+        case .flyOut, .align, .pair, .multiply, .collapse, .sum, .complete:
             // Align vertically on the right
             return CGPoint(x: animationCenter.x + 50, y: animationCenter.y + verticalOffset)
         }
     }
 
-    private var colCellOpacity: Double {
+    private func colCellOpacity(index: Int) -> Double {
         switch phase {
         case .ready, .flyOut, .align, .pair:
             return 1.0
-        case .multiply, .collapse, .sum, .complete:
+        case .multiply:
+            // Fade out as product is revealed
+            return index < visibleProductCount ? 0.0 : 1.0
+        case .collapse, .sum, .complete:
             return 0.0
         }
     }
@@ -254,6 +259,9 @@ struct MultiplicationAnimationOverlay: View {
             switch phase {
             case .pair:
                 return 1.0
+            case .multiply:
+                // Hide as product is revealed
+                return index < visibleProductCount ? 0.0 : 1.0
             default:
                 return 0.0
             }
@@ -275,8 +283,6 @@ struct MultiplicationAnimationOverlay: View {
 
         let position: CGPoint = {
             switch phase {
-            case .multiply:
-                return CGPoint(x: animationCenter.x, y: animationCenter.y + normalOffset)
             case .collapse, .sum, .complete:
                 return CGPoint(x: animationCenter.x, y: animationCenter.y)
             default:
@@ -286,7 +292,10 @@ struct MultiplicationAnimationOverlay: View {
 
         let opacity: Double = {
             switch phase {
-            case .multiply, .collapse:
+            case .multiply:
+                // Show only if this product has been revealed
+                return index < visibleProductCount ? 1.0 : 0.0
+            case .collapse:
                 return 1.0
             default:
                 return 0.0
@@ -305,9 +314,9 @@ struct MultiplicationAnimationOverlay: View {
         return Text("\(products.indices.contains(index) ? products[index] : 0)")
             .font(.title2)
             .fontWeight(.bold)
-            .foregroundColor(.green)
-            .frame(width: 50, height: 44)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.green.opacity(0.2)))
+            .foregroundColor(.white)
+            .frame(width: 56, height: 44)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.green.opacity(0.85)))
             .scaleEffect(scale)
             .position(position)
             .opacity(opacity)
@@ -322,6 +331,9 @@ struct MultiplicationAnimationOverlay: View {
         let opacity: Double = {
             switch phase {
             case .multiply:
+                // Show plus sign after the product at this index is revealed
+                return index < visibleProductCount - 1 ? 1.0 : 0.0
+            case .collapse:
                 return 1.0
             default:
                 return 0.0
@@ -329,7 +341,8 @@ struct MultiplicationAnimationOverlay: View {
         }()
 
         return Text("+")
-            .font(.headline)
+            .font(.title3)
+            .fontWeight(.bold)
             .foregroundColor(.green)
             .position(x: animationCenter.x, y: animationCenter.y + offset)
             .opacity(opacity)
@@ -395,7 +408,7 @@ struct MultiplicationAnimationOverlay: View {
         }
         totalDelay += timing.flyOutDuration + timing.alignDelay
 
-        // Phase 2: Align
+        // Phase 2: Align (skipped since flyOut goes directly to aligned position)
         withAnimation(.easeInOut(duration: timing.alignDuration).delay(totalDelay)) {
             phase = .align
         }
@@ -405,13 +418,21 @@ struct MultiplicationAnimationOverlay: View {
         withAnimation(.easeInOut(duration: timing.pairDuration).delay(totalDelay)) {
             phase = .pair
         }
-        totalDelay += timing.pairDuration + timing.multiplyDelay
+        totalDelay += timing.pairDuration + timing.productRevealDelay
 
-        // Phase 4: Multiply
-        withAnimation(.easeInOut(duration: timing.multiplyDuration).delay(totalDelay)) {
+        // Phase 4: Multiply - reveal products sequentially
+        withAnimation(.easeInOut(duration: 0.1).delay(totalDelay)) {
             phase = .multiply
         }
-        totalDelay += timing.multiplyDuration + timing.collapseDelay
+
+        // Reveal each product one at a time
+        for i in 0..<count {
+            let productDelay = totalDelay + Double(i) * timing.productRevealDelay
+            withAnimation(.easeInOut(duration: timing.productRevealDuration).delay(productDelay)) {
+                visibleProductCount = i + 1
+            }
+        }
+        totalDelay += Double(count) * timing.productRevealDelay + timing.collapseDelay
 
         // Phase 5: Collapse
         withAnimation(.easeInOut(duration: timing.collapseDuration).delay(totalDelay)) {
@@ -434,6 +455,7 @@ struct MultiplicationAnimationOverlay: View {
     private func resetAnimation() {
         withAnimation(.easeInOut(duration: 0.2)) {
             phase = .ready
+            visibleProductCount = 0
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             startAnimation()
@@ -445,7 +467,7 @@ struct MultiplicationAnimationOverlay: View {
 
 #Preview {
     ZStack {
-        Color.gray.opacity(0.3)
+        Color.gray.opacity(0.1)
         MultiplicationAnimationOverlay(
             cellPositions: [
                 CellPositionData(id: CellIdentifier(matrix: 0, row: 0, col: 0), frame: CGRect(x: 50, y: 100, width: 50, height: 50), value: 2),

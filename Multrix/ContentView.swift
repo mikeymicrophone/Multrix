@@ -40,6 +40,7 @@ struct ContentView: View {
 
     var body: some View {
         GeometryReader { outerGeo in
+            let contentWidth = min(outerGeo.size.width - 32, 560)
             ZStack {
                 ScrollView {
                     VStack(spacing: 24) {
@@ -102,6 +103,8 @@ struct ContentView: View {
                                         }
                                     )
                             }
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .offset(x: showingAnimation ? -60 : 0)
                         } else {
                             // iPhone: stacked
                             matrixAView
@@ -137,7 +140,7 @@ struct ContentView: View {
                             .font(.headline)
                             .foregroundColor(.white)
                             .padding()
-                            .frame(maxWidth: .infinity)
+                            .frame(maxWidth: contentWidth)
                             .background(canCalculate ? Color.blue : Color.gray)
                             .cornerRadius(12)
                         }
@@ -166,6 +169,7 @@ struct ContentView: View {
                                 }
                             )
                             .transition(.scale.combined(with: .opacity))
+                            .frame(maxWidth: contentWidth)
                         }
 
                         // Result
@@ -192,6 +196,7 @@ struct ContentView: View {
                                 }
                             }
                             .transition(.scale.combined(with: .opacity))
+                            .frame(maxWidth: contentWidth)
                         }
 
                         // Reset Button

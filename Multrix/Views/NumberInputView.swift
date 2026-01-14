@@ -87,7 +87,8 @@ struct NumberInputView: View {
             }
             .padding(.top, 8)
         }
-        .padding(24)
+        .padding(20)
+        .frame(width: 260)
         .background(Color(.systemBackground))
         .cornerRadius(20)
         .shadow(radius: 20)

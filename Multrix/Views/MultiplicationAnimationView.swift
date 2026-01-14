@@ -50,8 +50,9 @@ struct AnimationTiming {
     var productRevealDuration: Double = 0.3
     var productRevealDelay: Double = 0.5  // Delay between each product
 
-    var collapseDuration: Double = 0.4
-    var collapseDelay: Double = 0.4
+    var collapseDuration: Double = 0.3
+    var collapseDelay: Double = 0.3
+    var collapseStepDelay: Double = 0.4  // Delay between each product collapsing
 
     var sumDuration: Double = 0.3
     var sumDelay: Double = 0.2
@@ -74,10 +75,10 @@ struct MultiplicationAnimationOverlay: View {
     let selectedRow: Int
     let selectedCol: Int
     let finalSum: Int
-    let onComplete: () -> Void
 
     @State private var phase: AnimationPhase = .ready
     @State private var visibleProductCount: Int = 0  // How many products are visible (for sequential reveal)
+    @State private var collapsedCount: Int = 0  // How many products have collapsed into running sum
     @State private var timing = AnimationTiming()
 
     // Separate the cells into row (from A) and column (from B)
@@ -99,6 +100,17 @@ struct MultiplicationAnimationOverlay: View {
         zip(rowCells, colCells).map { $0.value * $1.value }
     }
 
+    // Running sums: runningSums[i] = sum of products[0...i]
+    private var runningSums: [Int] {
+        var sums: [Int] = []
+        var total = 0
+        for product in products {
+            total += product
+            sums.append(total)
+        }
+        return sums
+    }
+
     private var count: Int { rowCells.count }
 
     // Animation area center
@@ -108,66 +120,56 @@ struct MultiplicationAnimationOverlay: View {
 
     var body: some View {
         ZStack {
-            // Row cells (from Matrix A - blue)
-            ForEach(Array(rowCells.enumerated()), id: \.element.id) { index, cell in
-                animatedRowCell(cell: cell, index: index)
-            }
-
-            // Column cells (from Matrix B - purple)
-            ForEach(Array(colCells.enumerated()), id: \.element.id) { index, cell in
-                animatedColCell(cell: cell, index: index)
-            }
-
-            // Multiplication symbols
-            ForEach(0..<count, id: \.self) { index in
-                multiplySymbol(index: index)
-            }
-
-            // Products
-            ForEach(0..<count, id: \.self) { index in
-                productView(index: index)
-            }
-
-            // Plus signs between products
-            ForEach(0..<max(0, count - 1), id: \.self) { index in
-                plusSign(index: index)
-            }
-
-            // Final sum
-            sumView
-
-            // Phase indicator and controls
-            VStack {
-                Spacer()
-                HStack {
-                    Text(phase.description)
-                        .font(.caption)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(Color.orange.opacity(0.8)))
-                        .foregroundColor(.white)
-
-                    Spacer()
-
-                    Button("Reset") {
-                        resetAnimation()
-                    }
-                    .font(.caption)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(Color.gray.opacity(0.3)))
-
-                    Button("Close") {
-                        onComplete()
-                    }
-                    .font(.caption)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(Color.blue))
-                    .foregroundColor(.white)
+            // Animated elements - allow touches to pass through
+            Group {
+                // Row cells (from Matrix A - blue)
+                ForEach(Array(rowCells.enumerated()), id: \.element.id) { index, cell in
+                    animatedRowCell(cell: cell, index: index)
                 }
-                .padding()
+
+                // Column cells (from Matrix B - purple)
+                ForEach(Array(colCells.enumerated()), id: \.element.id) { index, cell in
+                    animatedColCell(cell: cell, index: index)
+                }
+
+                // Multiplication symbols
+                ForEach(0..<count, id: \.self) { index in
+                    multiplySymbol(index: index)
+                }
+
+                // Products
+                ForEach(0..<count, id: \.self) { index in
+                    productView(index: index)
+                }
+
+                // Plus signs between products
+                ForEach(0..<max(0, count - 1), id: \.self) { index in
+                    plusSign(index: index)
+                }
+
+                // Final sum
+                sumView
             }
+            .allowsHitTesting(false)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            HStack(spacing: 8) {
+                Text(phase.description)
+                    .font(.caption)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(Color.orange.opacity(0.8)))
+                    .foregroundColor(.white)
+
+                Button("Reset") {
+                    resetAnimation()
+                }
+                .font(.caption)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Capsule().fill(Color.gray.opacity(0.3)))
+            }
+            .padding(8)
         }
         .onAppear {
             startAnimation()
@@ -280,13 +282,35 @@ struct MultiplicationAnimationOverlay: View {
     private func productView(index: Int) -> some View {
         let verticalSpacing: CGFloat = 56
         let normalOffset = CGFloat(index - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
+        let firstProductOffset = CGFloat(0 - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
 
         let position: CGPoint = {
             switch phase {
-            case .collapse, .sum, .complete:
+            case .collapse:
+                if index == 0 {
+                    // First product stays in place, shows running sum
+                    return CGPoint(x: animationCenter.x, y: animationCenter.y + firstProductOffset)
+                } else if index <= collapsedCount {
+                    // This product has collapsed - move to first position
+                    return CGPoint(x: animationCenter.x, y: animationCenter.y + firstProductOffset)
+                } else {
+                    // Not yet collapsed - stay in place
+                    return CGPoint(x: animationCenter.x, y: animationCenter.y + normalOffset)
+                }
+            case .sum, .complete:
                 return CGPoint(x: animationCenter.x, y: animationCenter.y)
             default:
                 return CGPoint(x: animationCenter.x, y: animationCenter.y + normalOffset)
+            }
+        }()
+
+        // Determine what value to display
+        let displayValue: Int = {
+            if index == 0 && phase == .collapse && collapsedCount > 0 {
+                // Show running sum on first product
+                return runningSums.indices.contains(collapsedCount) ? runningSums[collapsedCount] : products.first ?? 0
+            } else {
+                return products.indices.contains(index) ? products[index] : 0
             }
         }()
 
@@ -296,28 +320,29 @@ struct MultiplicationAnimationOverlay: View {
                 // Show only if this product has been revealed
                 return index < visibleProductCount ? 1.0 : 0.0
             case .collapse:
-                return 1.0
+                if index == 0 {
+                    // First product always visible during collapse (shows running sum)
+                    return 1.0
+                } else if index <= collapsedCount {
+                    // This product has been absorbed into the sum
+                    return 0.0
+                } else {
+                    // Not yet collapsed
+                    return 1.0
+                }
+            case .sum, .complete:
+                return 0.0
             default:
                 return 0.0
             }
         }()
 
-        let scale: CGFloat = {
-            switch phase {
-            case .collapse, .sum, .complete:
-                return 0.3
-            default:
-                return 1.0
-            }
-        }()
-
-        return Text("\(products.indices.contains(index) ? products[index] : 0)")
+        return Text("\(displayValue)")
             .font(.title2)
             .fontWeight(.bold)
             .foregroundColor(.white)
             .frame(width: 56, height: 44)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.green.opacity(0.85)))
-            .scaleEffect(scale)
             .position(position)
             .opacity(opacity)
     }
@@ -334,7 +359,10 @@ struct MultiplicationAnimationOverlay: View {
                 // Show plus sign after the product at this index is revealed
                 return index < visibleProductCount - 1 ? 1.0 : 0.0
             case .collapse:
-                return 1.0
+                // Hide plus signs as products collapse
+                // Plus sign at index i is between products i and i+1
+                // Hide when product i+1 has collapsed (index < collapsedCount)
+                return index < collapsedCount ? 0.0 : 1.0
             default:
                 return 0.0
             }
@@ -351,6 +379,22 @@ struct MultiplicationAnimationOverlay: View {
     // MARK: - Sum View
 
     private var sumView: some View {
+        let verticalSpacing: CGFloat = 56
+        let firstProductOffset = CGFloat(0 - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
+        let firstProductPosition = CGPoint(x: animationCenter.x, y: animationCenter.y + firstProductOffset)
+
+        let position: CGPoint = {
+            switch phase {
+            case .sum:
+                // Start from first product position, then can animate to center
+                return firstProductPosition
+            case .complete:
+                return animationCenter
+            default:
+                return firstProductPosition
+            }
+        }()
+
         let opacity: Double = {
             switch phase {
             case .sum, .complete:
@@ -367,7 +411,7 @@ struct MultiplicationAnimationOverlay: View {
             case .complete:
                 return 1.0
             default:
-                return 0.5
+                return 0.8
             }
         }()
 
@@ -378,7 +422,7 @@ struct MultiplicationAnimationOverlay: View {
             .frame(width: 80, height: 60)
             .background(RoundedRectangle(cornerRadius: 12).fill(Color.green))
             .scaleEffect(scale)
-            .position(animationCenter)
+            .position(position)
             .opacity(opacity)
     }
 
@@ -434,11 +478,19 @@ struct MultiplicationAnimationOverlay: View {
         }
         totalDelay += Double(count) * timing.productRevealDelay + timing.collapseDelay
 
-        // Phase 5: Collapse
-        withAnimation(.easeInOut(duration: timing.collapseDuration).delay(totalDelay)) {
+        // Phase 5: Collapse - sequential sum animation
+        withAnimation(.easeInOut(duration: 0.1).delay(totalDelay)) {
             phase = .collapse
         }
-        totalDelay += timing.collapseDuration + timing.sumDelay
+
+        // Each product (starting from index 1) moves up and merges into running sum
+        for i in 1..<count {
+            let collapseStepDelay = totalDelay + Double(i - 1) * timing.collapseStepDelay
+            withAnimation(.easeInOut(duration: timing.collapseDuration).delay(collapseStepDelay)) {
+                collapsedCount = i
+            }
+        }
+        totalDelay += Double(max(0, count - 1)) * timing.collapseStepDelay + timing.sumDelay
 
         // Phase 6: Sum
         withAnimation(.easeInOut(duration: timing.sumDuration).delay(totalDelay)) {
@@ -456,6 +508,7 @@ struct MultiplicationAnimationOverlay: View {
         withAnimation(.easeInOut(duration: 0.2)) {
             phase = .ready
             visibleProductCount = 0
+            collapsedCount = 0
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             startAnimation()
@@ -478,8 +531,7 @@ struct MultiplicationAnimationOverlay: View {
             targetArea: CGRect(x: 300, y: 100, width: 200, height: 300),
             selectedRow: 0,
             selectedCol: 0,
-            finalSum: 23,
-            onComplete: {}
+            finalSum: 23
         )
     }
 }

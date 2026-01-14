@@ -219,10 +219,7 @@ struct ContentView: View {
                         targetArea: animationTargetArea,
                         selectedRow: selectedRow,
                         selectedCol: selectedCol,
-                        finalSum: result[selectedRow][selectedCol],
-                        onComplete: {
-                            showingAnimation = false
-                        }
+                        finalSum: result[selectedRow][selectedCol]
                     )
                 }
 

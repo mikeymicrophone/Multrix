@@ -55,7 +55,7 @@ struct CalculationBreakdownView: View {
                             Text("\(product)")
                                 .fontWeight(.medium)
                         }
-                        .font(.system(.body, design: .monospaced))
+                        .font(.system(.body, design: .rounded))
                     }
                 }
 
@@ -64,7 +64,7 @@ struct CalculationBreakdownView: View {
                 // Show the sum
                 HStack {
                     Text(products.map { String($0) }.joined(separator: " + "))
-                        .font(.system(.caption, design: .monospaced))
+                        .font(.system(.caption, design: .rounded))
                     Text("=")
                     Text("\(resultValue)")
                         .font(.headline)

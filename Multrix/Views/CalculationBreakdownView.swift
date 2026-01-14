@@ -13,9 +13,16 @@ struct CalculationBreakdownView: View {
     let resultRow: Int
     let resultCol: Int
     let resultValue: Int
+    let onAnimateTapped: () -> Void
 
     // The shared dimension (cols of A = rows of B)
     private var sharedDimension: Int { matrixA.cols }
+
+    private var products: [Int] {
+        (0..<sharedDimension).map { k in
+            (matrixA.values[resultRow][k] ?? 0) * (matrixB.values[k][resultCol] ?? 0)
+        }
+    }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -56,9 +63,6 @@ struct CalculationBreakdownView: View {
 
                 // Show the sum
                 HStack {
-                    let products = (0..<sharedDimension).map { k in
-                        (matrixA.values[resultRow][k] ?? 0) * (matrixB.values[k][resultCol] ?? 0)
-                    }
                     Text(products.map { String($0) }.joined(separator: " + "))
                         .font(.system(.caption, design: .monospaced))
                     Text("=")
@@ -66,6 +70,22 @@ struct CalculationBreakdownView: View {
                         .font(.headline)
                         .foregroundColor(.green)
                 }
+
+                // Animate button
+                Button(action: onAnimateTapped) {
+                    HStack {
+                        Image(systemName: "play.fill")
+                        Text("Animate")
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.orange)
+                    .cornerRadius(8)
+                }
+                .padding(.top, 8)
             }
             .padding()
             .background(
@@ -83,6 +103,7 @@ struct CalculationBreakdownView: View {
         matrixB: Matrix(rows: 3, cols: 2),
         resultRow: 0,
         resultCol: 0,
-        resultValue: 100
+        resultValue: 100,
+        onAnimateTapped: {}
     )
 }

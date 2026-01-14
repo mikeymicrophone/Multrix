@@ -10,7 +10,17 @@ import SwiftUI
 struct MatrixCellView: View {
     let value: Int?
     let isHighlighted: Bool
+    let cellId: CellIdentifier?  // If set, reports position when highlighted
+    let dimmed: Bool
     let onTap: () -> Void
+
+    init(value: Int?, isHighlighted: Bool, cellId: CellIdentifier? = nil, dimmed: Bool = false, onTap: @escaping () -> Void) {
+        self.value = value
+        self.isHighlighted = isHighlighted
+        self.cellId = cellId
+        self.dimmed = dimmed
+        self.onTap = onTap
+    }
 
     private var isEmpty: Bool { value == nil }
 
@@ -57,10 +67,26 @@ struct MatrixCellView: View {
             }
         }
         .frame(width: 50, height: 50)
+        .opacity(dimmed ? 0.3 : 1.0)
         .contentShape(Rectangle())
         .onTapGesture {
             onTap()
         }
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .preference(
+                        key: CellPositionPreferenceKey.self,
+                        value: cellId != nil && isHighlighted ? [
+                            CellPositionData(
+                                id: cellId!,
+                                frame: geo.frame(in: .named(MatrixCoordinateSpace.name)),
+                                value: value ?? 0
+                            )
+                        ] : []
+                    )
+            }
+        )
     }
 }
 

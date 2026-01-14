@@ -116,7 +116,7 @@ struct ContentView: View {
                 .disabled(!canCalculate)
                 .padding(.horizontal)
 
-                if !canCalculate {
+                if !matrixA.isComplete || !matrixB.isComplete {
                     Text("Fill in the missing numbers to calculate")
                         .font(.caption)
                         .foregroundColor(.orange)
@@ -189,6 +189,10 @@ struct ContentView: View {
                     } else {
                         matrixB.values[editingRow][editingCol] = number
                     }
+                    // Clear result so calculate button becomes active again
+                    result = nil
+                    selectedResultRow = nil
+                    selectedResultCol = nil
                 }
             }
         }
@@ -200,7 +204,7 @@ struct ContentView: View {
     }
 
     private var canCalculate: Bool {
-        matrixA.isComplete && matrixB.isComplete
+        matrixA.isComplete && matrixB.isComplete && result == nil
     }
 
     private func calculateResult() {

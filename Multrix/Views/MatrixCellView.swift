@@ -9,14 +9,15 @@ import SwiftUI
 
 struct MatrixCellView: View {
     let value: Int?
-    let isEditable: Bool
     let isHighlighted: Bool
     let onTap: () -> Void
+
+    private var isEmpty: Bool { value == nil }
 
     private var fillColor: Color {
         if isHighlighted {
             return Color.orange.opacity(0.3)
-        } else if isEditable {
+        } else if isEmpty {
             return Color.blue.opacity(0.2)
         } else {
             return Color.gray.opacity(0.1)
@@ -26,7 +27,7 @@ struct MatrixCellView: View {
     private var strokeColor: Color {
         if isHighlighted {
             return Color.orange
-        } else if isEditable {
+        } else if isEmpty {
             return Color.blue
         } else {
             return Color.gray.opacity(0.3)
@@ -34,7 +35,7 @@ struct MatrixCellView: View {
     }
 
     private var strokeWidth: CGFloat {
-        (isHighlighted || isEditable) ? 2 : 1
+        (isHighlighted || isEmpty) ? 2 : 1
     }
 
     var body: some View {
@@ -56,18 +57,17 @@ struct MatrixCellView: View {
             }
         }
         .frame(width: 50, height: 50)
+        .contentShape(Rectangle())
         .onTapGesture {
-            if isEditable {
-                onTap()
-            }
+            onTap()
         }
     }
 }
 
 #Preview {
     HStack {
-        MatrixCellView(value: 5, isEditable: false, isHighlighted: false, onTap: {})
-        MatrixCellView(value: nil, isEditable: true, isHighlighted: false, onTap: {})
-        MatrixCellView(value: 7, isEditable: false, isHighlighted: true, onTap: {})
+        MatrixCellView(value: 5, isHighlighted: false, onTap: {})
+        MatrixCellView(value: nil, isHighlighted: false, onTap: {})
+        MatrixCellView(value: 7, isHighlighted: true, onTap: {})
     }
 }

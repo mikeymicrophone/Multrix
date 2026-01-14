@@ -10,8 +10,6 @@ import Foundation
 struct Matrix: Identifiable {
     let id = UUID()
     var values: [[Int?]]
-    var missingRow: Int
-    var missingCol: Int
     let rows: Int
     let cols: Int
 
@@ -30,14 +28,16 @@ struct Matrix: Identifiable {
         }
 
         // Pick a random cell to be empty
-        missingRow = Int.random(in: 0..<rows)
-        missingCol = Int.random(in: 0..<cols)
+        let missingRow = Int.random(in: 0..<rows)
+        let missingCol = Int.random(in: 0..<cols)
         grid[missingRow][missingCol] = nil
 
         values = grid
     }
 
     var isComplete: Bool {
-        values[missingRow][missingCol] != nil
+        values.allSatisfy { row in
+            row.allSatisfy { $0 != nil }
+        }
     }
 }

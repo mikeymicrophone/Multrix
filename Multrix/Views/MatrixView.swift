@@ -21,7 +21,6 @@ struct MatrixView: View {
                         let isHighlighted = (highlightedRow == row) || (highlightedCol == col)
                         MatrixCellView(
                             value: matrix.values[row][col],
-                            isEditable: row == matrix.missingRow && col == matrix.missingCol,
                             isHighlighted: isHighlighted
                         ) {
                             onCellTap(row, col)

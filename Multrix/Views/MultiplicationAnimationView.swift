@@ -186,16 +186,16 @@ struct MultiplicationAnimationOverlay: View {
     private func rowCellPosition(cell: AnimatedCellData, index: Int) -> CGPoint {
         let verticalSpacing: CGFloat = 56
         let verticalOffset = CGFloat(index - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
+        let finalPosition = CGPoint(x: animationCenter.x - 50, y: animationCenter.y + verticalOffset)
 
         switch phase {
         case .ready:
+            // Start at original position in the matrix
             return CGPoint(x: cell.originalFrame.midX, y: cell.originalFrame.midY)
-        case .flyOut:
-            // Fly to animation area, spread horizontally
-            return CGPoint(x: animationCenter.x - 60 + CGFloat(index) * 40, y: animationCenter.y - 40)
-        case .align, .pair, .multiply, .collapse, .sum, .complete:
-            // Align vertically on the left
-            return CGPoint(x: animationCenter.x - 50, y: animationCenter.y + verticalOffset)
+        case .flyOut, .align, .pair, .multiply, .collapse, .sum, .complete:
+            // Each cell flies directly to its final vertical position
+            // The pivot effect comes from the group going from horizontal to vertical
+            return finalPosition
         }
     }
 

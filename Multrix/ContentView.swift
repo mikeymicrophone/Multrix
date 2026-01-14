@@ -28,6 +28,7 @@ struct ContentView: View {
 
     // Animation state
     @State private var showingAnimation = false
+    @State private var animationRunId = UUID()
     @State private var cellPositions: [CellPositionData] = []
     @State private var animationTargetArea: CGRect = .zero
 
@@ -159,6 +160,7 @@ struct ContentView: View {
                                 resultCol: selectedCol,
                                 resultValue: result[selectedRow][selectedCol],
                                 onAnimateTapped: {
+                                    animationRunId = UUID()
                                     showingAnimation = true
                                 }
                             )
@@ -221,6 +223,8 @@ struct ContentView: View {
                         selectedCol: selectedCol,
                         finalSum: result[selectedRow][selectedCol]
                     )
+                    .id(animationRunId)
+                    .allowsHitTesting(false)
                 }
 
                 // Number input overlay
@@ -261,7 +265,7 @@ struct ContentView: View {
                 matrix: $matrixA,
                 matrixIndex: 0,
                 highlightedRow: selectedResultRow,
-                animatingCells: showingAnimation
+                animatingCells: false
             ) { row, col in
                 editingMatrix = 0
                 editingRow = row
@@ -279,7 +283,7 @@ struct ContentView: View {
                 matrix: $matrixB,
                 matrixIndex: 1,
                 highlightedCol: selectedResultCol,
-                animatingCells: showingAnimation
+                animatingCells: false
             ) { row, col in
                 editingMatrix = 1
                 editingRow = row

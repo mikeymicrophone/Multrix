@@ -152,25 +152,6 @@ struct MultiplicationAnimationOverlay: View {
             }
             .allowsHitTesting(false)
         }
-        .overlay(alignment: .bottomTrailing) {
-            HStack(spacing: 8) {
-                Text(phase.description)
-                    .font(.caption)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Capsule().fill(Color.orange.opacity(0.8)))
-                    .foregroundColor(.white)
-
-                Button("Reset") {
-                    resetAnimation()
-                }
-                .font(.caption)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(Color.gray.opacity(0.3)))
-            }
-            .padding(8)
-        }
         .onAppear {
             startAnimation()
         }
@@ -444,6 +425,7 @@ struct MultiplicationAnimationOverlay: View {
     // MARK: - Animation Control
 
     private func startAnimation() {
+        guard count > 0 else { return }
         var totalDelay: Double = timing.flyOutDelay
 
         // Phase 1: Fly out
@@ -484,10 +466,12 @@ struct MultiplicationAnimationOverlay: View {
         }
 
         // Each product (starting from index 1) moves up and merges into running sum
-        for i in 1..<count {
-            let collapseStepDelay = totalDelay + Double(i - 1) * timing.collapseStepDelay
-            withAnimation(.easeInOut(duration: timing.collapseDuration).delay(collapseStepDelay)) {
-                collapsedCount = i
+        if count > 1 {
+            for i in 1..<count {
+                let collapseStepDelay = totalDelay + Double(i - 1) * timing.collapseStepDelay
+                withAnimation(.easeInOut(duration: timing.collapseDuration).delay(collapseStepDelay)) {
+                    collapsedCount = i
+                }
             }
         }
         totalDelay += Double(max(0, count - 1)) * timing.collapseStepDelay + timing.sumDelay
@@ -504,16 +488,6 @@ struct MultiplicationAnimationOverlay: View {
         }
     }
 
-    private func resetAnimation() {
-        withAnimation(.easeInOut(duration: 0.2)) {
-            phase = .ready
-            visibleProductCount = 0
-            collapsedCount = 0
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            startAnimation()
-        }
-    }
 }
 
 // MARK: - Preview

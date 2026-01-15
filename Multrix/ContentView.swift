@@ -24,7 +24,6 @@ struct ContentView: View {
     @State private var editingCol: Int = 0
     @State private var selectedResultRow: Int? = nil
     @State private var selectedResultCol: Int? = nil
-    @State private var showingDimensionPicker = false
 
     // Animation state
     @State private var showingAnimation = false
@@ -38,6 +37,7 @@ struct ContentView: View {
     @State private var isSequencePaused = false
     @State private var animationSpeed: AnimationSpeed = .normal
     @State private var additionMode: AdditionMode = .collapse
+    @State private var numberComplexity: NumberComplexity = .moderate
     @State private var showingPreferences = false
     @State private var sequenceTask: Task<Void, Never>? = nil
     @State private var cellPositions: [CellPositionData] = []
@@ -76,29 +76,6 @@ struct ContentView: View {
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
-
-                        // Dimension Picker Toggle
-                        Button(action: { showingDimensionPicker.toggle() }) {
-                            HStack {
-                                Image(systemName: showingDimensionPicker ? "chevron.up" : "chevron.down")
-                                Text("Dimensions: A[\(rowsA)×\(shared)] × B[\(shared)×\(colsB)]")
-                                Image(systemName: "slider.horizontal.3")
-                            }
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
-                        }
-
-                        if showingDimensionPicker {
-                            DimensionPickerView(
-                                rowsA: $rowsA,
-                                shared: $shared,
-                                colsB: $colsB
-                            ) {
-                                regenerateMatrices()
-                                showingDimensionPicker = false
-                            }
-                            .transition(.scale.combined(with: .opacity))
-                        }
 
                         // Input Matrices
                         if horizontalSizeClass == .regular {
@@ -336,13 +313,38 @@ struct ContentView: View {
         }
         .animation(.easeInOut, value: result != nil)
         .animation(.easeInOut, value: showingNumberInput)
-        .animation(.easeInOut, value: showingDimensionPicker)
         .animation(.easeInOut, value: selectedResultRow)
         .animation(.easeInOut, value: selectedResultCol)
         .animation(.easeInOut, value: showingAnimation)
         .sheet(isPresented: $showingPreferences) {
             NavigationStack {
                 Form {
+                    Section("Matrix Dimensions") {
+                        DimensionPickerView(
+                            rowsA: $rowsA,
+                            shared: $shared,
+                            colsB: $colsB
+                        ) {
+                            regenerateMatrices()
+                        }
+                    }
+
+                    Section {
+                        Picker("Complexity", selection: $numberComplexity) {
+                            ForEach(NumberComplexity.allCases, id: \.self) { complexity in
+                                Text(complexity.title).tag(complexity)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        Text(numberComplexity.description)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } header: {
+                        Text("Number Complexity")
+                    } footer: {
+                        Text("Changes apply to new matrices")
+                    }
+
                     Section("Animation Speed") {
                         Picker("Speed", selection: $animationSpeed) {
                             ForEach(AnimationSpeed.allCases, id: \.self) { speed in
@@ -438,8 +440,8 @@ struct ContentView: View {
 
     private func regenerateMatrices() {
         sequenceTask?.cancel()
-        matrixA = Matrix(rows: rowsA, cols: shared)
-        matrixB = Matrix(rows: shared, cols: colsB)
+        matrixA = Matrix(rows: rowsA, cols: shared, complexity: numberComplexity)
+        matrixB = Matrix(rows: shared, cols: colsB, complexity: numberComplexity)
         result = nil
         selectedResultRow = nil
         selectedResultCol = nil
@@ -455,8 +457,8 @@ struct ContentView: View {
 
     private func reset() {
         sequenceTask?.cancel()
-        matrixA = Matrix(rows: rowsA, cols: shared)
-        matrixB = Matrix(rows: shared, cols: colsB)
+        matrixA = Matrix(rows: rowsA, cols: shared, complexity: numberComplexity)
+        matrixB = Matrix(rows: shared, cols: colsB, complexity: numberComplexity)
         result = nil
         selectedResultRow = nil
         selectedResultCol = nil

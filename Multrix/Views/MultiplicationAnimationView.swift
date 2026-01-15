@@ -82,6 +82,18 @@ struct AnimationTiming {
     }
 }
 
+enum AdditionMode: Int, CaseIterable, Equatable {
+    case collapse   // Products slide together into sum
+    case longForm   // Traditional long addition with digits appearing right to left
+
+    var title: String {
+        switch self {
+        case .collapse: return "Collapse"
+        case .longForm: return "Long Addition"
+        }
+    }
+}
+
 enum AnimationSpeed: Int, CaseIterable, Equatable {
     case slow
     case normal
@@ -196,6 +208,7 @@ struct MultiplicationAnimationOverlay: View {
     let finalSum: Int
     let resultCellFrame: CGRect?
     let speed: AnimationSpeed
+    let additionMode: AdditionMode
     @Binding var isPaused: Bool
     let onResultPlaced: ((CGRect, Int) -> Void)?
     let onAnimationFinished: (() -> Void)?
@@ -203,6 +216,7 @@ struct MultiplicationAnimationOverlay: View {
     @State private var phase: AnimationPhase = .ready
     @State private var visibleProductCount: Int = 0  // How many products are visible (for sequential reveal)
     @State private var collapsedCount: Int = 0  // How many products have collapsed into running sum
+    @State private var visibleDigitCount: Int = 0  // For long form mode: digits revealed from right
     @State private var timing = AnimationTiming()
     @State private var animationTask: Task<Void, Never>? = nil
 
@@ -274,9 +288,23 @@ struct MultiplicationAnimationOverlay: View {
                     productView(index: index)
                 }
 
-                // Plus signs between products
-                ForEach(0..<max(0, count - 1), id: \.self) { index in
-                    plusSign(index: index)
+                // Equals signs (long form mode only)
+                if additionMode == .longForm {
+                    ForEach(0..<count, id: \.self) { index in
+                        equalsSign(index: index)
+                    }
+                }
+
+                // Plus signs between products (collapse mode only)
+                if additionMode == .collapse {
+                    ForEach(0..<max(0, count - 1), id: \.self) { index in
+                        plusSign(index: index)
+                    }
+                }
+
+                // Long form addition elements
+                if additionMode == .longForm {
+                    longFormAdditionView
                 }
 
                 // Final sum
@@ -323,11 +351,20 @@ struct MultiplicationAnimationOverlay: View {
     }
 
     private func rowCellOpacity(index: Int) -> Double {
+        // Long form mode: factors stay visible throughout (until flyToResult)
+        if additionMode == .longForm {
+            switch phase {
+            case .ready, .flyOut, .align, .pair, .multiply, .collapse, .sum, .complete:
+                return 1.0  // Always visible in long form
+            case .flyToResult:
+                return 0.0
+            }
+        }
+        // Collapse mode
         switch phase {
         case .ready, .flyOut, .align, .pair:
             return 1.0
         case .multiply:
-            // Fade out as product is revealed
             return index < visibleProductCount ? 0.0 : 1.0
         case .collapse, .sum, .flyToResult, .complete:
             return 0.0
@@ -359,11 +396,20 @@ struct MultiplicationAnimationOverlay: View {
     }
 
     private func colCellOpacity(index: Int) -> Double {
+        // Long form mode: factors stay visible throughout (until flyToResult)
+        if additionMode == .longForm {
+            switch phase {
+            case .ready, .flyOut, .align, .pair, .multiply, .collapse, .sum, .complete:
+                return 1.0  // Always visible in long form
+            case .flyToResult:
+                return 0.0
+            }
+        }
+        // Collapse mode
         switch phase {
         case .ready, .flyOut, .align, .pair:
             return 1.0
         case .multiply:
-            // Fade out as product is revealed
             return index < visibleProductCount ? 0.0 : 1.0
         case .collapse, .sum, .flyToResult, .complete:
             return 0.0
@@ -377,11 +423,22 @@ struct MultiplicationAnimationOverlay: View {
         let verticalOffset = CGFloat(index - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
 
         let opacity: Double = {
+            // Long form mode: multiply symbol stays visible
+            if additionMode == .longForm {
+                switch phase {
+                case .pair, .multiply, .collapse, .sum, .complete:
+                    return 1.0
+                case .flyToResult:
+                    return 0.0
+                default:
+                    return 0.0
+                }
+            }
+            // Collapse mode
             switch phase {
             case .pair:
                 return 1.0
             case .multiply:
-                // Hide as product is revealed
                 return index < visibleProductCount ? 0.0 : 1.0
             default:
                 return 0.0
@@ -403,17 +460,27 @@ struct MultiplicationAnimationOverlay: View {
         let normalOffset = CGFloat(index - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
         let firstProductOffset = CGFloat(0 - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
 
+        // Long form mode positions products further right to show full equation
+        let longFormProductX = animationCenter.x + 130
+
         let position: CGPoint = {
+            // Long form mode: products stay in place, further right
+            if additionMode == .longForm {
+                switch phase {
+                case .flyToResult:
+                    return resultCellCenter
+                default:
+                    return CGPoint(x: longFormProductX, y: animationCenter.y + normalOffset)
+                }
+            }
+            // Collapse mode: products collapse together
             switch phase {
             case .collapse:
                 if index == 0 {
-                    // First product stays in place, shows running sum
                     return CGPoint(x: animationCenter.x, y: animationCenter.y + firstProductOffset)
                 } else if index <= collapsedCount {
-                    // This product has collapsed - move to first position
                     return CGPoint(x: animationCenter.x, y: animationCenter.y + firstProductOffset)
                 } else {
-                    // Not yet collapsed - stay in place
                     return CGPoint(x: animationCenter.x, y: animationCenter.y + normalOffset)
                 }
             case .sum, .complete:
@@ -427,8 +494,12 @@ struct MultiplicationAnimationOverlay: View {
 
         // Determine what value to display
         let displayValue: Int = {
+            // Long form mode: always show the actual product
+            if additionMode == .longForm {
+                return products.indices.contains(index) ? products[index] : 0
+            }
+            // Collapse mode: first product shows running sum
             if index == 0 && phase == .collapse && collapsedCount > 0 {
-                // Show running sum on first product
                 return runningSums.indices.contains(collapsedCount) ? runningSums[collapsedCount] : products.first ?? 0
             } else {
                 return products.indices.contains(index) ? products[index] : 0
@@ -436,24 +507,32 @@ struct MultiplicationAnimationOverlay: View {
         }()
 
         let opacity: Double = {
+            // Long form mode: products stay visible until flyToResult
+            if additionMode == .longForm {
+                switch phase {
+                case .multiply:
+                    return index < visibleProductCount ? 1.0 : 0.0
+                case .collapse, .sum, .complete:
+                    return 1.0
+                case .flyToResult:
+                    return 0.0
+                default:
+                    return 0.0
+                }
+            }
+            // Collapse mode
             switch phase {
             case .multiply:
-                // Show only if this product has been revealed
                 return index < visibleProductCount ? 1.0 : 0.0
             case .collapse:
                 if index == 0 {
-                    // First product always visible during collapse (shows running sum)
                     return 1.0
                 } else if index <= collapsedCount {
-                    // This product has been absorbed into the sum
                     return 0.0
                 } else {
-                    // Not yet collapsed
                     return 1.0
                 }
-            case .sum, .complete:
-                return 0.0
-            case .flyToResult:
+            case .sum, .complete, .flyToResult:
                 return 0.0
             default:
                 return 0.0
@@ -467,6 +546,37 @@ struct MultiplicationAnimationOverlay: View {
             .frame(width: 56, height: 44)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.green.opacity(0.85)))
             .position(position)
+            .opacity(opacity)
+    }
+
+    // MARK: - Equals Sign (Long Form Mode)
+
+    private func equalsSign(index: Int) -> some View {
+        let verticalSpacing: CGFloat = 56
+        let verticalOffset = CGFloat(index - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
+
+        // Position between column cell (at +50) and product (at +130)
+        let xPosition = animationCenter.x + 90
+
+        let opacity: Double = {
+            switch phase {
+            case .multiply:
+                // Show equals sign when the product at this index is revealed
+                return index < visibleProductCount ? 1.0 : 0.0
+            case .collapse, .sum, .complete:
+                return 1.0
+            case .flyToResult:
+                return 0.0
+            default:
+                return 0.0
+            }
+        }()
+
+        return Text("=")
+            .font(.title2)
+            .fontWeight(.bold)
+            .foregroundColor(.gray)
+            .position(x: xPosition, y: animationCenter.y + verticalOffset)
             .opacity(opacity)
     }
 
@@ -504,12 +614,21 @@ struct MultiplicationAnimationOverlay: View {
     private var sumView: some View {
         let verticalSpacing: CGFloat = 56
         let firstProductOffset = CGFloat(0 - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
+        let lastProductOffset = CGFloat(count - 1 - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
         let firstProductPosition = CGPoint(x: animationCenter.x, y: animationCenter.y + firstProductOffset)
+        let longFormSumPosition = CGPoint(x: animationCenter.x + 50, y: animationCenter.y + lastProductOffset + 50)
 
         let position: CGPoint = {
+            if additionMode == .longForm {
+                switch phase {
+                case .flyToResult:
+                    return resultCellCenter
+                default:
+                    return longFormSumPosition
+                }
+            }
             switch phase {
             case .sum:
-                // Start from first product position, then can animate to center
                 return firstProductPosition
             case .complete:
                 return animationCenter
@@ -521,6 +640,10 @@ struct MultiplicationAnimationOverlay: View {
         }()
 
         let opacity: Double = {
+            if additionMode == .longForm {
+                // In long form, only show during flyToResult
+                return phase == .flyToResult ? 1.0 : 0.0
+            }
             switch phase {
             case .sum, .complete, .flyToResult:
                 return 1.0
@@ -530,6 +653,9 @@ struct MultiplicationAnimationOverlay: View {
         }()
 
         let scale: CGFloat = {
+            if additionMode == .longForm {
+                return phase == .flyToResult ? 0.65 : 0.8
+            }
             switch phase {
             case .sum:
                 return 1.3
@@ -551,6 +677,65 @@ struct MultiplicationAnimationOverlay: View {
             .scaleEffect(scale)
             .position(position)
             .opacity(opacity)
+    }
+
+    // MARK: - Long Form Addition View
+
+    private var longFormAdditionView: some View {
+        let verticalSpacing: CGFloat = 56
+        let lastProductOffset = CGFloat(count - 1 - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
+        let lineY = animationCenter.y + lastProductOffset + 30
+        let sumY = lineY + 25
+
+        let showLine = phase == .collapse || phase == .sum || phase == .complete
+        let showPlusSign = phase == .collapse || phase == .sum || phase == .complete
+
+        // Calculate the digits of the sum
+        let sumDigits = digitsOf(finalSum)
+        let digitCount = sumDigits.count
+
+        return Group {
+            // Plus sign to the left
+            Text("+")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.orange)
+                .position(x: animationCenter.x - 10, y: lineY - 15)
+                .opacity(showPlusSign ? 1.0 : 0.0)
+
+            // Horizontal line below products
+            Rectangle()
+                .fill(Color.primary)
+                .frame(width: 80, height: 2)
+                .position(x: animationCenter.x + 50, y: lineY)
+                .opacity(showLine ? 1.0 : 0.0)
+
+            // Sum digits appearing from right to left
+            ForEach(0..<digitCount, id: \.self) { digitIndex in
+                let digit = sumDigits[digitCount - 1 - digitIndex]  // Reverse order for display
+                let xOffset = CGFloat(digitIndex - digitCount / 2) * 18 + (digitCount.isMultiple(of: 2) ? 9 : 0)
+                let isVisible = (digitCount - 1 - digitIndex) < visibleDigitCount
+
+                Text("\(digit)")
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(.green)
+                    .position(x: animationCenter.x + 50 + xOffset, y: sumY)
+                    .opacity(isVisible && (phase == .sum || phase == .complete) ? 1.0 : 0.0)
+                    .scaleEffect(isVisible ? 1.0 : 0.5)
+            }
+        }
+    }
+
+    private func digitsOf(_ number: Int) -> [Int] {
+        if number == 0 { return [0] }
+        var n = abs(number)
+        var digits: [Int] = []
+        while n > 0 {
+            digits.append(n % 10)
+            n /= 10
+        }
+        return digits  // Returns digits in reverse order (ones place first)
     }
 
     // MARK: - Cell View Helper
@@ -610,20 +795,25 @@ struct MultiplicationAnimationOverlay: View {
         await pauseAwareSleep(seconds: adjustedTiming.productRevealDuration)
         await pauseAwareSleep(seconds: adjustedTiming.collapseDelay)
 
-        // Phase 5: Collapse - sequential sum animation
+        // Phase 5: Collapse - different behavior based on mode
         withAnimation(.easeInOut(duration: quickTransition)) {
             phase = .collapse
         }
 
-        // Each product (starting from index 1) moves up and merges into running sum
-        if count > 1 {
-            for i in 1..<count {
-                await pauseAwareSleep(seconds: adjustedTiming.collapseStepDelay)
-                withAnimation(.easeInOut(duration: adjustedTiming.collapseDuration)) {
-                    collapsedCount = i
+        if additionMode == .longForm {
+            // Long form: just show line and plus sign, no collapse animation
+            await pauseAwareSleep(seconds: adjustedTiming.collapseDelay)
+        } else {
+            // Collapse mode: products move up and merge into running sum
+            if count > 1 {
+                for i in 1..<count {
+                    await pauseAwareSleep(seconds: adjustedTiming.collapseStepDelay)
+                    withAnimation(.easeInOut(duration: adjustedTiming.collapseDuration)) {
+                        collapsedCount = i
+                    }
                 }
+                await pauseAwareSleep(seconds: adjustedTiming.collapseDuration)
             }
-            await pauseAwareSleep(seconds: adjustedTiming.collapseDuration)
         }
         await pauseAwareSleep(seconds: adjustedTiming.sumDelay)
 
@@ -631,8 +821,22 @@ struct MultiplicationAnimationOverlay: View {
         withAnimation(.easeInOut(duration: adjustedTiming.sumDuration)) {
             phase = .sum
         }
-        let sumPause = speed == .fastest ? 0.05 : 0.3
-        await pauseAwareSleep(seconds: adjustedTiming.sumDuration + sumPause)
+
+        if additionMode == .longForm {
+            // Long form: reveal digits one at a time from right to left
+            let digitCount = digitsOf(finalSum).count
+            let digitDelay = speed == .fastest ? 0.08 : (speed == .fast ? 0.15 : 0.25)
+            for i in 0..<digitCount {
+                await pauseAwareSleep(seconds: digitDelay)
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    visibleDigitCount = i + 1
+                }
+            }
+            await pauseAwareSleep(seconds: 0.2)
+        } else {
+            let sumPause = speed == .fastest ? 0.05 : 0.3
+            await pauseAwareSleep(seconds: adjustedTiming.sumDuration + sumPause)
+        }
 
         // Phase 7: Complete
         let completeDuration = speed == .fastest ? 0.05 : 0.2
@@ -652,7 +856,7 @@ struct MultiplicationAnimationOverlay: View {
         onAnimationFinished?()
     }
 
-    static func totalDuration(count: Int, speed: AnimationSpeed) -> Double {
+    static func totalDuration(count: Int, speed: AnimationSpeed, additionMode: AdditionMode = .collapse, finalSum: Int = 0) -> Double {
         guard count > 0 else { return 0 }
         let base = AnimationTiming()
         let timing = base.scaled(for: speed)
@@ -664,12 +868,26 @@ struct MultiplicationAnimationOverlay: View {
         totalDelay += timing.pairDuration
         totalDelay += Double(count) * timing.productRevealDelay + timing.productRevealDuration
         totalDelay += timing.collapseDelay
-        if count > 1 {
-            totalDelay += Double(count - 1) * timing.collapseStepDelay
-            totalDelay += timing.collapseDuration
+
+        if additionMode == .longForm {
+            // Long form: just collapse delay, then digits
+            totalDelay += timing.collapseDelay
+            totalDelay += timing.sumDelay
+            totalDelay += timing.sumDuration
+            // Digit reveal time
+            let digitCount = max(1, String(abs(finalSum)).count)
+            let digitDelay = speed == .fastest ? 0.08 : (speed == .fast ? 0.15 : 0.25)
+            totalDelay += Double(digitCount) * digitDelay + 0.2
+        } else {
+            // Collapse mode
+            if count > 1 {
+                totalDelay += Double(count - 1) * timing.collapseStepDelay
+                totalDelay += timing.collapseDuration
+            }
+            totalDelay += timing.sumDelay
+            totalDelay += timing.sumDuration + sumPause
         }
-        totalDelay += timing.sumDelay
-        totalDelay += timing.sumDuration + sumPause
+
         totalDelay += completeDuration + timing.flyToResultDelay
         totalDelay += timing.flyToResultDuration
         return totalDelay
@@ -718,6 +936,7 @@ struct MultiplicationAnimationOverlay: View {
             finalSum: 23,
             resultCellFrame: CGRect(x: 100, y: 400, width: 50, height: 50),
             speed: .normal,
+            additionMode: .collapse,
             isPaused: .constant(false),
             onResultPlaced: nil,
             onAnimationFinished: nil

@@ -37,6 +37,7 @@ struct ContentView: View {
     @State private var isAnimatingSequence = false
     @State private var isSequencePaused = false
     @State private var animationSpeed: AnimationSpeed = .normal
+    @State private var additionMode: AdditionMode = .collapse
     @State private var showingPreferences = false
     @State private var sequenceTask: Task<Void, Never>? = nil
     @State private var cellPositions: [CellPositionData] = []
@@ -286,6 +287,7 @@ struct ContentView: View {
                         finalSum: finalSum,
                         resultCellFrame: animationResultCellFrame,
                         speed: animationSpeed,
+                        additionMode: additionMode,
                         isPaused: $isSequencePaused,
                         onResultPlaced: { frame, value in
                             let id = ResultCellIdentifier(row: selectedRow, col: selectedCol)
@@ -345,6 +347,15 @@ struct ContentView: View {
                         Picker("Speed", selection: $animationSpeed) {
                             ForEach(AnimationSpeed.allCases, id: \.self) { speed in
                                 Text(speed.title).tag(speed)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    Section("Addition Style") {
+                        Picker("Style", selection: $additionMode) {
+                            ForEach(AdditionMode.allCases, id: \.self) { mode in
+                                Text(mode.title).tag(mode)
                             }
                         }
                         .pickerStyle(.segmented)
@@ -551,7 +562,8 @@ struct ContentView: View {
         showingAnimation = true
 
         let count = matrixA.cols
-        let duration = MultiplicationAnimationOverlay.totalDuration(count: count, speed: animationSpeed)
+        let finalSum = result[row][col]
+        let duration = MultiplicationAnimationOverlay.totalDuration(count: count, speed: animationSpeed, additionMode: additionMode, finalSum: finalSum)
         let buffer: Double = animationSpeed == .fastest ? 0.02 : (animationSpeed == .fast ? 0.08 : 0.15)
         let total = duration + buffer
         await waitWhilePaused(totalDuration: total)

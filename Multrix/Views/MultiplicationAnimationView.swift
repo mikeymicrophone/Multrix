@@ -118,7 +118,7 @@ enum AnimationSpeed: Int, CaseIterable, Equatable {
         case .slow: return 1.4
         case .normal: return 1.0
         case .fast: return 0.8
-        case .fastest: return 0.6
+        case .fastest: return 0.3
         }
     }
 
@@ -127,7 +127,7 @@ enum AnimationSpeed: Int, CaseIterable, Equatable {
         case .slow: return 1.3
         case .normal: return 1.0
         case .fast: return 0.7
-        case .fastest: return 0.5
+        case .fastest: return 0.15
         }
     }
 
@@ -136,7 +136,7 @@ enum AnimationSpeed: Int, CaseIterable, Equatable {
         case .slow: return 1.5
         case .normal: return 1.0
         case .fast: return 0.7
-        case .fastest: return 0.5
+        case .fastest: return 0.2
         }
     }
 
@@ -145,7 +145,7 @@ enum AnimationSpeed: Int, CaseIterable, Equatable {
         case .slow: return 1.4
         case .normal: return 1.0
         case .fast: return 0.6
-        case .fastest: return 0.45
+        case .fastest: return 0.1
         }
     }
 
@@ -154,7 +154,7 @@ enum AnimationSpeed: Int, CaseIterable, Equatable {
         case .slow: return 1.4
         case .normal: return 1.0
         case .fast: return 0.7
-        case .fastest: return 0.5
+        case .fastest: return 0.15
         }
     }
 
@@ -163,7 +163,7 @@ enum AnimationSpeed: Int, CaseIterable, Equatable {
         case .slow: return 1.3
         case .normal: return 1.0
         case .fast: return 0.75
-        case .fastest: return 0.6
+        case .fastest: return 0.25
         }
     }
 
@@ -172,7 +172,7 @@ enum AnimationSpeed: Int, CaseIterable, Equatable {
         case .slow: return 1.2
         case .normal: return 1.0
         case .fast: return 0.8
-        case .fastest: return 0.65
+        case .fastest: return 0.3
         }
     }
 }
@@ -595,7 +595,8 @@ struct MultiplicationAnimationOverlay: View {
         await pauseAwareSleep(seconds: adjustedTiming.pairDuration + adjustedTiming.productRevealDelay)
 
         // Phase 4: Multiply - reveal products sequentially
-        withAnimation(.easeInOut(duration: 0.1)) {
+        let quickTransition = speed == .fastest ? 0.03 : 0.1
+        withAnimation(.easeInOut(duration: quickTransition)) {
             phase = .multiply
         }
 
@@ -610,7 +611,7 @@ struct MultiplicationAnimationOverlay: View {
         await pauseAwareSleep(seconds: adjustedTiming.collapseDelay)
 
         // Phase 5: Collapse - sequential sum animation
-        withAnimation(.easeInOut(duration: 0.1)) {
+        withAnimation(.easeInOut(duration: quickTransition)) {
             phase = .collapse
         }
 
@@ -630,13 +631,15 @@ struct MultiplicationAnimationOverlay: View {
         withAnimation(.easeInOut(duration: adjustedTiming.sumDuration)) {
             phase = .sum
         }
-        await pauseAwareSleep(seconds: adjustedTiming.sumDuration + 0.3)
+        let sumPause = speed == .fastest ? 0.05 : 0.3
+        await pauseAwareSleep(seconds: adjustedTiming.sumDuration + sumPause)
 
         // Phase 7: Complete
-        withAnimation(.easeInOut(duration: 0.2)) {
+        let completeDuration = speed == .fastest ? 0.05 : 0.2
+        withAnimation(.easeInOut(duration: completeDuration)) {
             phase = .complete
         }
-        await pauseAwareSleep(seconds: 0.2 + adjustedTiming.flyToResultDelay)
+        await pauseAwareSleep(seconds: completeDuration + adjustedTiming.flyToResultDelay)
 
         // Phase 8: Fly to result cell
         if let frame = resultCellFrame {
@@ -653,6 +656,8 @@ struct MultiplicationAnimationOverlay: View {
         guard count > 0 else { return 0 }
         let base = AnimationTiming()
         let timing = base.scaled(for: speed)
+        let sumPause = speed == .fastest ? 0.05 : 0.3
+        let completeDuration = speed == .fastest ? 0.05 : 0.2
         var totalDelay: Double = timing.flyOutDelay
         totalDelay += timing.flyOutDuration + timing.alignDelay
         totalDelay += timing.alignDuration + timing.pairDelay
@@ -660,12 +665,12 @@ struct MultiplicationAnimationOverlay: View {
         totalDelay += Double(count) * timing.productRevealDelay + timing.productRevealDuration
         totalDelay += timing.collapseDelay
         if count > 1 {
-            totalDelay += Double(max(0, count - 2)) * timing.collapseStepDelay
+            totalDelay += Double(count - 1) * timing.collapseStepDelay
             totalDelay += timing.collapseDuration
         }
         totalDelay += timing.sumDelay
-        totalDelay += timing.sumDuration + 0.3
-        totalDelay += 0.2 + timing.flyToResultDelay
+        totalDelay += timing.sumDuration + sumPause
+        totalDelay += completeDuration + timing.flyToResultDelay
         totalDelay += timing.flyToResultDuration
         return totalDelay
     }

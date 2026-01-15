@@ -37,6 +37,7 @@ struct ContentView: View {
     @State private var isAnimatingSequence = false
     @State private var isSequencePaused = false
     @State private var animationSpeed: AnimationSpeed = .normal
+    @State private var showingPreferences = false
     @State private var sequenceTask: Task<Void, Never>? = nil
     @State private var cellPositions: [CellPositionData] = []
     @State private var resultCellPositions: [ResultCellPositionData] = []
@@ -53,6 +54,17 @@ struct ContentView: View {
             ZStack {
                 ScrollView {
                     VStack(spacing: 24) {
+                        HStack {
+                            Spacer()
+                            Button(action: { showingPreferences = true }) {
+                                Image(systemName: "gearshape")
+                                    .font(.title3)
+                                    .foregroundColor(.blue)
+                                    .padding(8)
+                            }
+                            .accessibilityLabel("Preferences")
+                        }
+
                         Text("Matrix Multiplication")
                             .font(.largeTitle)
                             .fontWeight(.bold)
@@ -113,7 +125,6 @@ struct ContentView: View {
                                     )
                             }
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .offset(x: showingAnimation ? -60 : 0)
                         } else {
                             // iPhone: stacked
                             matrixAView
@@ -163,18 +174,6 @@ struct ContentView: View {
                         }
 
                         HStack(spacing: 16) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Speed")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Picker("Speed", selection: $animationSpeed) {
-                                    ForEach(AnimationSpeed.allCases, id: \.self) { speed in
-                                        Text(speed.title).tag(speed)
-                                    }
-                                }
-                                .pickerStyle(.segmented)
-                            }
-
                             Button(action: {
                                 isSequencePaused.toggle()
                             }) {
@@ -293,7 +292,11 @@ struct ContentView: View {
                             resultStamps[id] = value
                         },
                         onAnimationFinished: {
-                            showingAnimation = false
+                            // Only hide animation if not in a sequence
+                            // During sequences, we keep showingAnimation true and change the ID
+                            if !isAnimatingSequence {
+                                showingAnimation = false
+                            }
                         }
                     )
                     .id(animationRunId)
@@ -335,6 +338,28 @@ struct ContentView: View {
         .animation(.easeInOut, value: selectedResultRow)
         .animation(.easeInOut, value: selectedResultCol)
         .animation(.easeInOut, value: showingAnimation)
+        .sheet(isPresented: $showingPreferences) {
+            NavigationStack {
+                Form {
+                    Section("Animation Speed") {
+                        Picker("Speed", selection: $animationSpeed) {
+                            ForEach(AnimationSpeed.allCases, id: \.self) { speed in
+                                Text(speed.title).tag(speed)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                }
+                .navigationTitle("Preferences")
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") {
+                            showingPreferences = false
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private var matrixAView: some View {
@@ -478,6 +503,7 @@ struct ContentView: View {
             }
             isAnimatingSequence = false
             isSequencePaused = false
+            showingAnimation = false
         }
     }
 
@@ -507,6 +533,7 @@ struct ContentView: View {
             }
             isAnimatingSequence = false
             isSequencePaused = false
+            showingAnimation = false
         }
     }
 
@@ -525,7 +552,7 @@ struct ContentView: View {
 
         let count = matrixA.cols
         let duration = MultiplicationAnimationOverlay.totalDuration(count: count, speed: animationSpeed)
-        let buffer: Double = 0.15
+        let buffer: Double = animationSpeed == .fastest ? 0.02 : (animationSpeed == .fast ? 0.08 : 0.15)
         let total = duration + buffer
         await waitWhilePaused(totalDuration: total)
     }

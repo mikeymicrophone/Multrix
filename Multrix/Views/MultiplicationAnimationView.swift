@@ -217,6 +217,7 @@ struct MultiplicationAnimationOverlay: View {
     @State private var visibleProductCount: Int = 0  // How many products are visible (for sequential reveal)
     @State private var collapsedCount: Int = 0  // How many products have collapsed into running sum
     @State private var visibleDigitCount: Int = 0  // For long form mode: digits revealed from right
+    @State private var visibleCarryCount: Int = 0  // For long form mode: carries revealed
     @State private var timing = AnimationTiming()
     @State private var animationTask: Task<Void, Never>? = nil
 
@@ -616,7 +617,7 @@ struct MultiplicationAnimationOverlay: View {
         let firstProductOffset = CGFloat(0 - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
         let lastProductOffset = CGFloat(count - 1 - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
         let firstProductPosition = CGPoint(x: animationCenter.x, y: animationCenter.y + firstProductOffset)
-        let longFormSumPosition = CGPoint(x: animationCenter.x + 50, y: animationCenter.y + lastProductOffset + 50)
+        let longFormSumPosition = CGPoint(x: animationCenter.x + 130, y: animationCenter.y + lastProductOffset + 60)
 
         let position: CGPoint = {
             if additionMode == .longForm {
@@ -681,11 +682,44 @@ struct MultiplicationAnimationOverlay: View {
 
     // MARK: - Long Form Addition View
 
+    // Calculate carries for long addition
+    private var carries: [Int] {
+        var result: [Int] = []
+        var carry = 0
+
+        // Find max digit count among products
+        let maxDigits = products.map { digitsOf($0).count }.max() ?? 1
+
+        for digitPos in 0..<maxDigits {
+            var columnSum = carry
+            for product in products {
+                let digits = digitsOf(product)
+                if digitPos < digits.count {
+                    columnSum += digits[digitPos]
+                }
+            }
+            carry = columnSum / 10
+            result.append(carry)
+        }
+
+        // Add final carry if exists
+        if carry > 0 {
+            result.append(0)  // No carry beyond the final digit
+        }
+
+        return result  // carries[i] is the carry from position i to position i+1
+    }
+
     private var longFormAdditionView: some View {
         let verticalSpacing: CGFloat = 56
+        let firstProductOffset = CGFloat(0 - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
         let lastProductOffset = CGFloat(count - 1 - count / 2) * verticalSpacing + (count.isMultiple(of: 2) ? verticalSpacing / 2 : 0)
         let lineY = animationCenter.y + lastProductOffset + 30
-        let sumY = lineY + 25
+        let sumY = lineY + 30
+        let carryY = animationCenter.y + firstProductOffset - 25  // Above the first product
+
+        // Products are at x + 130, so line and sum should be centered there
+        let productCenterX = animationCenter.x + 130
 
         let showLine = phase == .collapse || phase == .sum || phase == .complete
         let showPlusSign = phase == .collapse || phase == .sum || phase == .complete
@@ -693,34 +727,59 @@ struct MultiplicationAnimationOverlay: View {
         // Calculate the digits of the sum
         let sumDigits = digitsOf(finalSum)
         let digitCount = sumDigits.count
+        let digitSpacing: CGFloat = 16
+
+        // Find the widest product to size the line appropriately
+        let maxProductDigits = products.map { digitsOf($0).count }.max() ?? 1
+        let lineWidth = max(80, CGFloat(max(maxProductDigits, digitCount)) * digitSpacing + 40)
 
         return Group {
-            // Plus sign to the left
+            // Plus sign to the left of the products
             Text("+")
                 .font(.title2)
                 .fontWeight(.bold)
                 .foregroundColor(.orange)
-                .position(x: animationCenter.x - 10, y: lineY - 15)
+                .position(x: productCenterX - lineWidth / 2 - 15, y: lineY - 15)
                 .opacity(showPlusSign ? 1.0 : 0.0)
 
             // Horizontal line below products
             Rectangle()
                 .fill(Color.primary)
-                .frame(width: 80, height: 2)
-                .position(x: animationCenter.x + 50, y: lineY)
+                .frame(width: lineWidth, height: 2)
+                .position(x: productCenterX, y: lineY)
                 .opacity(showLine ? 1.0 : 0.0)
+
+            // Carry digits above the products (appear during sum phase)
+            ForEach(0..<carries.count, id: \.self) { carryIndex in
+                let carryValue = carries[carryIndex]
+                if carryValue > 0 {
+                    // Position carry above the next column to the left
+                    // carryIndex 0 means carry from ones to tens, so position above tens column
+                    let xOffset = -CGFloat(carryIndex + 1) * digitSpacing + CGFloat(digitCount - 1) * digitSpacing / 2
+                    let isVisible = carryIndex < visibleCarryCount
+
+                    Text("\(carryValue)")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.orange)
+                        .position(x: productCenterX + xOffset, y: carryY)
+                        .opacity(isVisible && (phase == .sum || phase == .complete) ? 1.0 : 0.0)
+                        .scaleEffect(isVisible ? 1.0 : 0.3)
+                }
+            }
 
             // Sum digits appearing from right to left
             ForEach(0..<digitCount, id: \.self) { digitIndex in
                 let digit = sumDigits[digitCount - 1 - digitIndex]  // Reverse order for display
-                let xOffset = CGFloat(digitIndex - digitCount / 2) * 18 + (digitCount.isMultiple(of: 2) ? 9 : 0)
+                // Right-align: rightmost digit at productCenterX + offset, moving left
+                let xOffset = -CGFloat(digitCount - 1 - digitIndex) * digitSpacing + CGFloat(digitCount - 1) * digitSpacing / 2
                 let isVisible = (digitCount - 1 - digitIndex) < visibleDigitCount
 
                 Text("\(digit)")
                     .font(.title)
                     .fontWeight(.bold)
                     .foregroundColor(.green)
-                    .position(x: animationCenter.x + 50 + xOffset, y: sumY)
+                    .position(x: productCenterX + xOffset, y: sumY)
                     .opacity(isVisible && (phase == .sum || phase == .complete) ? 1.0 : 0.0)
                     .scaleEffect(isVisible ? 1.0 : 0.5)
             }
@@ -823,13 +882,18 @@ struct MultiplicationAnimationOverlay: View {
         }
 
         if additionMode == .longForm {
-            // Long form: reveal digits one at a time from right to left
+            // Long form: reveal digits one at a time from right to left, with carries
             let digitCount = digitsOf(finalSum).count
+            let carryList = carries
             let digitDelay = speed == .fastest ? 0.08 : (speed == .fast ? 0.15 : 0.25)
             for i in 0..<digitCount {
                 await pauseAwareSleep(seconds: digitDelay)
                 withAnimation(.easeInOut(duration: 0.15)) {
                     visibleDigitCount = i + 1
+                    // Show carry if there is one at this position (carry from position i)
+                    if i < carryList.count && carryList[i] > 0 {
+                        visibleCarryCount = i + 1
+                    }
                 }
             }
             await pauseAwareSleep(seconds: 0.2)

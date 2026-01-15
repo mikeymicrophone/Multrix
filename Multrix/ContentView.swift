@@ -2,30 +2,35 @@
 //  ContentView.swift
 //  Multrix
 //
-//  Created by Mike Schwab on 1/13/26.
-//
 
 import SwiftUI
 
 struct ContentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    // Dimensions: A is (rowsA × shared), B is (shared × colsB), Result is (rowsA × colsB)
+    // MARK: - Matrix State
+
     @State private var rowsA: Int = 4
     @State private var shared: Int = 4
     @State private var colsB: Int = 4
-
     @State private var matrixA: Matrix
     @State private var matrixB: Matrix
     @State private var result: [[Int]]? = nil
-    @State private var showingNumberInput = false
-    @State private var editingMatrix: Int = 0  // 0 for A, 1 for B
-    @State private var editingRow: Int = 0
-    @State private var editingCol: Int = 0
+
+    // MARK: - Selection State
+
     @State private var selectedResultRow: Int? = nil
     @State private var selectedResultCol: Int? = nil
 
-    // Animation state
+    // MARK: - Number Input State
+
+    @State private var showingNumberInput = false
+    @State private var editingMatrix: Int = 0
+    @State private var editingRow: Int = 0
+    @State private var editingCol: Int = 0
+
+    // MARK: - Animation State
+
     @State private var showingAnimation = false
     @State private var animationRunId = UUID()
     @State private var animationSelectedRow: Int? = nil
@@ -35,6 +40,13 @@ struct ContentView: View {
     @State private var resultStamps: [ResultCellIdentifier: Int] = [:]
     @State private var isAnimatingSequence = false
     @State private var isSequencePaused = false
+    @State private var sequenceTask: Task<Void, Never>? = nil
+    @State private var cellPositions: [CellPositionData] = []
+    @State private var resultCellPositions: [ResultCellPositionData] = []
+    @State private var animationTargetArea: CGRect = .zero
+
+    // MARK: - Preferences State
+
     @State private var animationSpeed: AnimationSpeed = .normal
     @State private var additionMode: AdditionMode = .collapse
     @State private var numberComplexity: NumberComplexity = .moderate
@@ -43,327 +55,42 @@ struct ContentView: View {
     @State private var pendingShared: Int = 4
     @State private var pendingColsB: Int = 4
     @State private var pendingComplexity: NumberComplexity = .moderate
-    @State private var sequenceTask: Task<Void, Never>? = nil
-    @State private var cellPositions: [CellPositionData] = []
-    @State private var resultCellPositions: [ResultCellPositionData] = []
-    @State private var animationTargetArea: CGRect = .zero
+
+    // MARK: - Computed Properties
+
+    private var canCalculate: Bool {
+        matrixA.isComplete && matrixB.isComplete && result == nil
+    }
+
+    private var isAnimating: Bool {
+        isAnimatingSequence || showingAnimation
+    }
+
+    private var sortedResultStampIds: [ResultCellIdentifier] {
+        resultStamps.keys.sorted { lhs, rhs in
+            if lhs.row != rhs.row { return lhs.row < rhs.row }
+            return lhs.col < rhs.col
+        }
+    }
+
+    // MARK: - Init
 
     init() {
         _matrixA = State(initialValue: Matrix(rows: 4, cols: 4))
         _matrixB = State(initialValue: Matrix(rows: 4, cols: 4))
     }
 
+    // MARK: - Body
+
     var body: some View {
         GeometryReader { outerGeo in
             let contentWidth = min(outerGeo.size.width - 32, 560)
+
             ZStack {
-                ScrollView {
-                    VStack(spacing: 24) {
-                        HStack {
-                            Spacer()
-
-                            // Pause button - only visible during animation
-                            if isAnimatingSequence || showingAnimation {
-                                Button(action: {
-                                    isSequencePaused.toggle()
-                                }) {
-                                    Image(systemName: isSequencePaused ? "play.fill" : "pause.fill")
-                                        .font(.title3)
-                                        .foregroundColor(.white)
-                                        .padding(8)
-                                        .background(Color.orange)
-                                        .clipShape(Circle())
-                                }
-                            }
-
-                            Button(action: {
-                                pendingRowsA = rowsA
-                                pendingShared = shared
-                                pendingColsB = colsB
-                                pendingComplexity = numberComplexity
-                                showingPreferences = true
-                            }) {
-                                Image(systemName: "gearshape")
-                                    .font(.title3)
-                                    .foregroundColor(.blue)
-                                    .padding(8)
-                            }
-                            .accessibilityLabel("Preferences")
-                        }
-
-                        Text("Matrix Multiplication")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .padding(.top)
-
-                        // Input Matrices
-                        if horizontalSizeClass == .regular {
-                            // iPad: side by side with animation area
-                            HStack(alignment: .center, spacing: 24) {
-                                matrixAView
-                                Text("×")
-                                    .font(.largeTitle)
-                                    .fontWeight(.bold)
-                                matrixBView
-
-                                // Animation target area (invisible, just for positioning)
-                                Color.clear
-                                    .frame(width: 200, height: max(CGFloat(shared) * 60, 200))
-                                    .background(
-                                        GeometryReader { geo in
-                                            Color.clear
-                                                .onAppear {
-                                                    animationTargetArea = geo.frame(in: .named(MatrixCoordinateSpace.name))
-                                                }
-                                                .onChange(of: geo.frame(in: .named(MatrixCoordinateSpace.name))) { _, newValue in
-                                                    animationTargetArea = newValue
-                                                }
-                                        }
-                                    )
-                            }
-                            .frame(maxWidth: .infinity, alignment: .center)
-                        } else {
-                            // iPhone: stacked
-                            matrixAView
-                            Text("×")
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                            matrixBView
-
-                            // Animation target area below matrices on iPhone
-                            if selectedResultRow != nil && selectedResultCol != nil {
-                                Color.clear
-                                    .frame(height: max(CGFloat(shared) * 60 + 100, 250))
-                                    .background(
-                                        GeometryReader { geo in
-                                            Color.clear
-                                                .onAppear {
-                                                    animationTargetArea = geo.frame(in: .named(MatrixCoordinateSpace.name))
-                                                }
-                                                .onChange(of: geo.frame(in: .named(MatrixCoordinateSpace.name))) { _, newValue in
-                                                    animationTargetArea = newValue
-                                                }
-                                        }
-                                    )
-                            }
-                        }
-
-                        // Calculate Button
-                        Button(action: calculateResult) {
-                            HStack {
-                                Text("Multiply")
-                            }
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding()
-//                            .frame(maxWidth: contentWidth/2)
-                            .background(canCalculate ? Color.blue : Color.gray)
-                            .cornerRadius(12)
-                        }
-                        .disabled(!canCalculate)
-                        .padding(.horizontal)
-
-                        if !matrixA.isComplete || !matrixB.isComplete {
-                            Text("Fill in the missing numbers to calculate")
-                                .font(.caption)
-                                .foregroundColor(.orange)
-                        }
-
-                        // Calculation Breakdown and Result
-                        if let result = result {
-                            if horizontalSizeClass == .regular {
-                                // iPad: side by side layout
-                                HStack(alignment: .top, spacing: 24) {
-                                    // Calculation breakdown on left
-                                    if let selectedRow = selectedResultRow,
-                                       let selectedCol = selectedResultCol {
-                                        CalculationBreakdownView(
-                                            matrixA: matrixA,
-                                            matrixB: matrixB,
-                                            resultRow: selectedRow,
-                                            resultCol: selectedCol,
-                                            resultValue: result[selectedRow][selectedCol],
-                                            onAnimateTapped: {
-                                                animationSelectedRow = selectedRow
-                                                animationSelectedCol = selectedCol
-                                                animationResultValue = result[selectedRow][selectedCol]
-                                                animationResultCellFrame = resultCellPositions.first {
-                                                    $0.id.row == selectedRow && $0.id.col == selectedCol
-                                                }?.frame
-                                                animationRunId = UUID()
-                                                showingAnimation = true
-                                            },
-                                            onAnimateAllTapped: {
-                                                startSequentialAnimation()
-                                            },
-                                            onAnimateRandomTapped: {
-                                                startRandomAnimation()
-                                            },
-                                            isAnimatingSequence: isAnimatingSequence
-                                        )
-                                        .frame(maxWidth: 280)
-                                    }
-
-                                    // Result matrix on right
-                                    VStack(spacing: 8) {
-                                        Text("Result [\(matrixA.rows)×\(matrixB.cols)]")
-                                            .font(.headline)
-                                        Text("Tap a cell to see how it was calculated")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                        ResultMatrixView(
-                                            values: result,
-                                            selectedRow: selectedResultRow,
-                                            selectedCol: selectedResultCol
-                                        ) { row, col in
-                                            if selectedResultRow == row && selectedResultCol == col {
-                                                selectedResultRow = nil
-                                                selectedResultCol = nil
-                                            } else {
-                                                selectedResultRow = row
-                                                selectedResultCol = col
-                                            }
-                                        }
-                                    }
-                                }
-                                .transition(.scale.combined(with: .opacity))
-                            } else {
-                                // iPhone: stacked layout
-                                if let selectedRow = selectedResultRow,
-                                   let selectedCol = selectedResultCol {
-                                    CalculationBreakdownView(
-                                        matrixA: matrixA,
-                                        matrixB: matrixB,
-                                        resultRow: selectedRow,
-                                        resultCol: selectedCol,
-                                        resultValue: result[selectedRow][selectedCol],
-                                        onAnimateTapped: {
-                                            animationSelectedRow = selectedRow
-                                            animationSelectedCol = selectedCol
-                                            animationResultValue = result[selectedRow][selectedCol]
-                                            animationResultCellFrame = resultCellPositions.first {
-                                                $0.id.row == selectedRow && $0.id.col == selectedCol
-                                            }?.frame
-                                            animationRunId = UUID()
-                                            showingAnimation = true
-                                        },
-                                        onAnimateAllTapped: {
-                                            startSequentialAnimation()
-                                        },
-                                        onAnimateRandomTapped: {
-                                            startRandomAnimation()
-                                        },
-                                        isAnimatingSequence: isAnimatingSequence
-                                    )
-                                    .transition(.scale.combined(with: .opacity))
-                                    .frame(maxWidth: contentWidth)
-                                }
-
-                                VStack(spacing: 8) {
-                                    Text("Result [\(matrixA.rows)×\(matrixB.cols)]")
-                                        .font(.headline)
-                                    Text("Tap a cell to see how it was calculated")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    ResultMatrixView(
-                                        values: result,
-                                        selectedRow: selectedResultRow,
-                                        selectedCol: selectedResultCol
-                                    ) { row, col in
-                                        if selectedResultRow == row && selectedResultCol == col {
-                                            selectedResultRow = nil
-                                            selectedResultCol = nil
-                                        } else {
-                                            selectedResultRow = row
-                                            selectedResultCol = col
-                                        }
-                                    }
-                                }
-                                .transition(.scale.combined(with: .opacity))
-                                .frame(maxWidth: contentWidth)
-                            }
-                        }
-
-                        // Reset Button
-                        Button(action: reset) {
-                            HStack {
-                                Image(systemName: "arrow.counterclockwise")
-                                Text("New Matrices")
-                            }
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
-                        }
-                        .padding(.bottom)
-                    }
-                    .padding()
-                }
-                .scrollDisabled(showingAnimation || isAnimatingSequence)
-                .coordinateSpace(name: MatrixCoordinateSpace.name)
-                .onPreferenceChange(CellPositionPreferenceKey.self) { positions in
-                    cellPositions = positions
-                }
-                .onPreferenceChange(ResultCellPositionPreferenceKey.self) { positions in
-                    resultCellPositions = positions
-                }
-
-                // Animation overlay
-                if showingAnimation,
-                   let selectedRow = animationSelectedRow,
-                   let selectedCol = animationSelectedCol,
-                   let finalSum = animationResultValue {
-                    MultiplicationAnimationOverlay(
-                        cellPositions: cellPositions,
-                        targetArea: animationTargetArea,
-                        selectedRow: selectedRow,
-                        selectedCol: selectedCol,
-                        finalSum: finalSum,
-                        resultCellFrame: animationResultCellFrame,
-                        speed: animationSpeed,
-                        additionMode: additionMode,
-                        isPaused: $isSequencePaused,
-                        onResultPlaced: { frame, value in
-                            let id = ResultCellIdentifier(row: selectedRow, col: selectedCol)
-                            resultStamps[id] = value
-                        },
-                        onAnimationFinished: {
-                            // Only hide animation if not in a sequence
-                            // During sequences, we keep showingAnimation true and change the ID
-                            if !isAnimatingSequence {
-                                showingAnimation = false
-                            }
-                        }
-                    )
-                    .id(animationRunId)
-                    .allowsHitTesting(false)
-                }
-
-                ForEach(sortedResultStampIds, id: \.self) { id in
-                    if let frame = resultCellFrame(for: id), let value = resultStamps[id] {
-                        resultStampView(id: id, frame: frame, value: value)
-                            .allowsHitTesting(false)
-                    }
-                }
-
-                // Number input overlay
-                if showingNumberInput {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            showingNumberInput = false
-                        }
-
-                    NumberInputView(isPresented: $showingNumberInput) { number in
-                        if editingMatrix == 0 {
-                            matrixA.values[editingRow][editingCol] = number
-                        } else {
-                            matrixB.values[editingRow][editingCol] = number
-                        }
-                        // Clear result so calculate button becomes active again
-                        result = nil
-                        selectedResultRow = nil
-                        selectedResultCol = nil
-                    }
-                }
+                mainContent(contentWidth: contentWidth)
+                animationOverlay
+                resultStampsOverlay
+                numberInputOverlay
             }
         }
         .animation(.easeInOut, value: result != nil)
@@ -372,125 +99,187 @@ struct ContentView: View {
         .animation(.easeInOut, value: selectedResultCol)
         .animation(.easeInOut, value: showingAnimation)
         .animation(.easeInOut, value: isAnimatingSequence)
-        .sheet(isPresented: $showingPreferences, onDismiss: {
-            // Apply changes if dimensions or complexity changed
-            let dimensionsChanged = pendingRowsA != rowsA || pendingShared != shared || pendingColsB != colsB
-            let complexityChanged = pendingComplexity != numberComplexity
+        .sheet(isPresented: $showingPreferences, onDismiss: applyPreferencesIfChanged) {
+            PreferencesSheetView(
+                rowsA: $pendingRowsA,
+                shared: $pendingShared,
+                colsB: $pendingColsB,
+                complexity: $pendingComplexity,
+                animationSpeed: $animationSpeed,
+                additionMode: $additionMode,
+                onDone: { showingPreferences = false }
+            )
+        }
+    }
 
-            if dimensionsChanged || complexityChanged {
-                rowsA = pendingRowsA
-                shared = pendingShared
-                colsB = pendingColsB
-                numberComplexity = pendingComplexity
-                regenerateMatrices()
+    // MARK: - Main Content
+
+    private func mainContent(contentWidth: CGFloat) -> some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                HeaderToolbarView(
+                    isAnimating: isAnimating,
+                    isPaused: isSequencePaused,
+                    onPauseTapped: { isSequencePaused.toggle() },
+                    onSettingsTapped: openPreferences
+                )
+
+                Text("Matrix Multiplication")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.top)
+
+                InputMatricesSectionView(
+                    matrixA: $matrixA,
+                    matrixB: $matrixB,
+                    selectedResultRow: selectedResultRow,
+                    selectedResultCol: selectedResultCol,
+                    sharedDimension: shared,
+                    onCellTapped: handleCellTapped,
+                    onAnimationAreaChanged: { animationTargetArea = $0 }
+                )
+
+                CalculateButtonView(
+                    canCalculate: canCalculate,
+                    showIncompleteMessage: !matrixA.isComplete || !matrixB.isComplete,
+                    onCalculate: calculateResult
+                )
+
+                if let result = result {
+                    ResultSectionView(
+                        result: result,
+                        matrixA: matrixA,
+                        matrixB: matrixB,
+                        selectedRow: selectedResultRow,
+                        selectedCol: selectedResultCol,
+                        isAnimatingSequence: isAnimatingSequence,
+                        contentWidth: contentWidth,
+                        onCellSelected: handleResultCellSelected,
+                        onAnimateTapped: animateSelectedCell,
+                        onAnimateAllTapped: startSequentialAnimation,
+                        onAnimateRandomTapped: startRandomAnimation
+                    )
+                }
+
+                ResetButtonView(onReset: reset)
             }
-        }) {
-            NavigationStack {
-                Form {
-                    Section {
-                        DimensionPickerView(
-                            rowsA: $pendingRowsA,
-                            shared: $pendingShared,
-                            colsB: $pendingColsB
-                        )
-                    } header: {
-                        Text("Matrix Dimensions")
-                    } footer: {
-                        Text("A[\(pendingRowsA)×\(pendingShared)] × B[\(pendingShared)×\(pendingColsB)] = Result[\(pendingRowsA)×\(pendingColsB)]")
-                    }
+            .padding()
+        }
+        .scrollDisabled(isAnimating)
+        .coordinateSpace(name: MatrixCoordinateSpace.name)
+        .onPreferenceChange(CellPositionPreferenceKey.self) { cellPositions = $0 }
+        .onPreferenceChange(ResultCellPositionPreferenceKey.self) { resultCellPositions = $0 }
+    }
 
-                    Section {
-                        Picker("Complexity", selection: $pendingComplexity) {
-                            ForEach(NumberComplexity.allCases, id: \.self) { complexity in
-                                Text(complexity.title).tag(complexity)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        Text(pendingComplexity.description)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } header: {
-                        Text("Number Complexity")
-                    }
+    // MARK: - Overlays
 
-                    Section("Animation Speed") {
-                        Picker("Speed", selection: $animationSpeed) {
-                            ForEach(AnimationSpeed.allCases, id: \.self) { speed in
-                                Text(speed.title).tag(speed)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
-
-                    Section("Addition Style") {
-                        Picker("Style", selection: $additionMode) {
-                            ForEach(AdditionMode.allCases, id: \.self) { mode in
-                                Text(mode.title).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.segmented)
+    @ViewBuilder
+    private var animationOverlay: some View {
+        if showingAnimation,
+           let selectedRow = animationSelectedRow,
+           let selectedCol = animationSelectedCol,
+           let finalSum = animationResultValue {
+            MultiplicationAnimationOverlay(
+                cellPositions: cellPositions,
+                targetArea: animationTargetArea,
+                selectedRow: selectedRow,
+                selectedCol: selectedCol,
+                finalSum: finalSum,
+                resultCellFrame: animationResultCellFrame,
+                speed: animationSpeed,
+                additionMode: additionMode,
+                isPaused: $isSequencePaused,
+                onResultPlaced: { _, value in
+                    let id = ResultCellIdentifier(row: selectedRow, col: selectedCol)
+                    resultStamps[id] = value
+                },
+                onAnimationFinished: {
+                    if !isAnimatingSequence {
+                        showingAnimation = false
                     }
                 }
-                .navigationTitle("Preferences")
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Done") {
-                            showingPreferences = false
-                        }
-                    }
+            )
+            .id(animationRunId)
+            .allowsHitTesting(false)
+        }
+    }
+
+    @ViewBuilder
+    private var resultStampsOverlay: some View {
+        ForEach(sortedResultStampIds, id: \.self) { id in
+            if let frame = resultCellFrame(for: id), let value = resultStamps[id] {
+                ResultStampView(value: value, frame: frame)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var numberInputOverlay: some View {
+        if showingNumberInput {
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .onTapGesture { showingNumberInput = false }
+
+            NumberInputView(isPresented: $showingNumberInput) { number in
+                if editingMatrix == 0 {
+                    matrixA.values[editingRow][editingCol] = number
+                } else {
+                    matrixB.values[editingRow][editingCol] = number
                 }
-            }
-            .interactiveDismissDisabled()
-        }
-    }
-
-    private var matrixAView: some View {
-        VStack(spacing: 8) {
-            Text("Matrix A [\(matrixA.rows)×\(matrixA.cols)]")
-                .font(.headline)
-            MatrixView(
-                matrix: $matrixA,
-                matrixIndex: 0,
-                highlightedRow: selectedResultRow,
-                animatingCells: false
-            ) { row, col in
-                editingMatrix = 0
-                editingRow = row
-                editingCol = col
-                showingNumberInput = true
+                result = nil
+                selectedResultRow = nil
+                selectedResultCol = nil
             }
         }
     }
+}
 
-    private var matrixBView: some View {
-        VStack(spacing: 8) {
-            Text("Matrix B [\(matrixB.rows)×\(matrixB.cols)]")
-                .font(.headline)
-            MatrixView(
-                matrix: $matrixB,
-                matrixIndex: 1,
-                highlightedCol: selectedResultCol,
-                animatingCells: false
-            ) { row, col in
-                editingMatrix = 1
-                editingRow = row
-                editingCol = col
-                showingNumberInput = true
-            }
-        }
+// MARK: - Actions
+
+extension ContentView {
+    private func handleCellTapped(matrix: Int, row: Int, col: Int) {
+        editingMatrix = matrix
+        editingRow = row
+        editingCol = col
+        showingNumberInput = true
     }
 
-    private var canCalculate: Bool {
-        matrixA.isComplete && matrixB.isComplete && result == nil
+    private func handleResultCellSelected(row: Int?, col: Int?) {
+        selectedResultRow = row
+        selectedResultCol = col
+    }
+
+    private func openPreferences() {
+        pendingRowsA = rowsA
+        pendingShared = shared
+        pendingColsB = colsB
+        pendingComplexity = numberComplexity
+        showingPreferences = true
+    }
+
+    private func applyPreferencesIfChanged() {
+        let dimensionsChanged = pendingRowsA != rowsA || pendingShared != shared || pendingColsB != colsB
+        let complexityChanged = pendingComplexity != numberComplexity
+
+        if dimensionsChanged || complexityChanged {
+            rowsA = pendingRowsA
+            shared = pendingShared
+            colsB = pendingColsB
+            numberComplexity = pendingComplexity
+            regenerateMatrices()
+        }
     }
 
     private func calculateResult() {
-        // Matrix multiplication: C[i][j] = sum(A[i][k] * B[k][j]) for k in 0..<shared
         let resultRows = matrixA.rows
         let resultCols = matrixB.cols
         let sharedDim = matrixA.cols
 
-        var resultMatrix: [[Int]] = Array(repeating: Array(repeating: 0, count: resultCols), count: resultRows)
+        var resultMatrix: [[Int]] = Array(
+            repeating: Array(repeating: 0, count: resultCols),
+            count: resultRows
+        )
 
         for i in 0..<resultRows {
             for j in 0..<resultCols {
@@ -505,7 +294,6 @@ struct ContentView: View {
         }
 
         result = resultMatrix
-        // Auto-select first cell so calculation breakdown is visible
         selectedResultRow = 0
         selectedResultCol = 0
     }
@@ -514,23 +302,17 @@ struct ContentView: View {
         sequenceTask?.cancel()
         matrixA = Matrix(rows: rowsA, cols: shared, complexity: numberComplexity)
         matrixB = Matrix(rows: shared, cols: colsB, complexity: numberComplexity)
-        result = nil
-        selectedResultRow = nil
-        selectedResultCol = nil
-        animationSelectedRow = nil
-        animationSelectedCol = nil
-        animationResultValue = nil
-        animationResultCellFrame = nil
-        showingAnimation = false
-        resultStamps = [:]
-        isAnimatingSequence = false
-        isSequencePaused = false
+        clearAnimationState()
     }
 
     private func reset() {
         sequenceTask?.cancel()
         matrixA = Matrix(rows: rowsA, cols: shared, complexity: numberComplexity)
         matrixB = Matrix(rows: shared, cols: colsB, complexity: numberComplexity)
+        clearAnimationState()
+    }
+
+    private func clearAnimationState() {
         result = nil
         selectedResultRow = nil
         selectedResultCol = nil
@@ -544,34 +326,27 @@ struct ContentView: View {
         isSequencePaused = false
     }
 
-    private func resultStampView(id: ResultCellIdentifier, frame: CGRect, value: Int) -> some View {
-        Text("\(value)")
-            .font(.system(size: 14, weight: .bold, design: .rounded))
-            .foregroundColor(.white)
-            .lineLimit(1)
-            .minimumScaleFactor(0.5)
-            .frame(width: 50, height: 50)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Color.green.opacity(0.9)))
-            .scaleEffect(0.9)
-            .position(x: frame.midX, y: frame.midY)
-    }
+    private func animateSelectedCell() {
+        guard let row = selectedResultRow,
+              let col = selectedResultCol,
+              let result = result else { return }
 
-    private var sortedResultStampIds: [ResultCellIdentifier] {
-        resultStamps.keys.sorted { lhs, rhs in
-            if lhs.row != rhs.row {
-                return lhs.row < rhs.row
-            }
-            return lhs.col < rhs.col
-        }
+        animationSelectedRow = row
+        animationSelectedCol = col
+        animationResultValue = result[row][col]
+        animationResultCellFrame = resultCellPositions.first {
+            $0.id.row == row && $0.id.col == col
+        }?.frame
+        animationRunId = UUID()
+        showingAnimation = true
     }
+}
 
-    private func resultCellFrame(for id: ResultCellIdentifier) -> CGRect? {
-        resultCellPositions.first { $0.id.row == id.row && $0.id.col == id.col }?.frame
-    }
+// MARK: - Animation Sequences
 
+extension ContentView {
     private func startSequentialAnimation() {
-        guard !isAnimatingSequence else { return }
-        guard let result else { return }
+        guard !isAnimatingSequence, let result else { return }
         isAnimatingSequence = true
         sequenceTask?.cancel()
         sequenceTask = Task { @MainActor in
@@ -579,55 +354,50 @@ struct ContentView: View {
             let cols = result.first?.count ?? 0
             for row in 0..<rows {
                 for col in 0..<cols {
-                    if resultStamps[ResultCellIdentifier(row: row, col: col)] != nil {
-                        continue
-                    }
+                    if resultStamps[ResultCellIdentifier(row: row, col: col)] != nil { continue }
                     await waitForSequenceResume()
                     await animateResultCell(row: row, col: col, result: result)
                     if Task.isCancelled { break }
                 }
                 if Task.isCancelled { break }
             }
-            isAnimatingSequence = false
-            isSequencePaused = false
-            showingAnimation = false
+            finishAnimationSequence()
         }
     }
 
     private func startRandomAnimation() {
-        guard !isAnimatingSequence else { return }
-        guard let result else { return }
+        guard !isAnimatingSequence, let result else { return }
         isAnimatingSequence = true
         sequenceTask?.cancel()
         sequenceTask = Task { @MainActor in
             let rows = result.count
             let cols = result.first?.count ?? 0
-            var ids: [ResultCellIdentifier] = []
-            ids.reserveCapacity(rows * cols)
-            for row in 0..<rows {
-                for col in 0..<cols {
-                    ids.append(ResultCellIdentifier(row: row, col: col))
-                }
+            var ids = (0..<rows).flatMap { row in
+                (0..<cols).map { ResultCellIdentifier(row: row, col: $0) }
             }
             ids.shuffle()
+
             for id in ids {
-                if resultStamps[id] != nil {
-                    continue
-                }
+                if resultStamps[id] != nil { continue }
                 await waitForSequenceResume()
                 await animateResultCell(row: id.row, col: id.col, result: result)
                 if Task.isCancelled { break }
             }
-            isAnimatingSequence = false
-            isSequencePaused = false
-            showingAnimation = false
+            finishAnimationSequence()
         }
+    }
+
+    private func finishAnimationSequence() {
+        isAnimatingSequence = false
+        isSequencePaused = false
+        showingAnimation = false
     }
 
     private func animateResultCell(row: Int, col: Int, result: [[Int]]) async {
         selectedResultRow = row
         selectedResultCol = col
         await waitForAnimationData(row: row, col: col)
+
         animationSelectedRow = row
         animationSelectedCol = col
         animationResultValue = result[row][col]
@@ -639,19 +409,29 @@ struct ContentView: View {
 
         let count = matrixA.cols
         let finalSum = result[row][col]
-        let duration = MultiplicationAnimationOverlay.totalDuration(count: count, speed: animationSpeed, additionMode: additionMode, finalSum: finalSum)
+        let duration = MultiplicationAnimationOverlay.totalDuration(
+            count: count,
+            speed: animationSpeed,
+            additionMode: additionMode,
+            finalSum: finalSum
+        )
         let buffer: Double = animationSpeed == .fastest ? 0.02 : (animationSpeed == .fast ? 0.08 : 0.15)
-        let total = duration + buffer
-        await waitWhilePaused(totalDuration: total)
+        await waitWhilePaused(totalDuration: duration + buffer)
+    }
+}
+
+// MARK: - Helpers
+
+extension ContentView {
+    private func resultCellFrame(for id: ResultCellIdentifier) -> CGRect? {
+        resultCellPositions.first { $0.id.row == id.row && $0.id.col == id.col }?.frame
     }
 
     private func waitForAnimationData(row: Int, col: Int) async {
         let maxAttempts = 20
         let delayNanos: UInt64 = 30_000_000
         for _ in 0..<maxAttempts {
-            if hasAnimationData(row: row, col: col) {
-                return
-            }
+            if hasAnimationData(row: row, col: col) { return }
             try? await Task.sleep(nanoseconds: delayNanos)
         }
     }
@@ -677,13 +457,14 @@ struct ContentView: View {
                 await waitForSequenceResume()
             } else {
                 let slice = min(step, remaining)
-                let nanos = UInt64(slice * 1_000_000_000)
-                try? await Task.sleep(nanoseconds: nanos)
+                try? await Task.sleep(nanoseconds: UInt64(slice * 1_000_000_000))
                 remaining -= slice
             }
         }
     }
 }
+
+// MARK: - Preview
 
 #Preview {
     ContentView()

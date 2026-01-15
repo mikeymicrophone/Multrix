@@ -28,102 +28,101 @@ struct CalculationBreakdownView: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("Calculation for Result[\(resultRow + 1),\(resultCol + 1)]")
-                .font(.headline)
+        VStack(spacing: 8) {
+            Text("Result[\(resultRow + 1),\(resultCol + 1)]")
+                .font(.subheadline)
+                .fontWeight(.semibold)
                 .foregroundColor(.orange)
 
-            // Show the formula
-            VStack(spacing: 8) {
-                Text("Row \(resultRow + 1) of A × Column \(resultCol + 1) of B")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+            // Show each multiplication
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(0..<sharedDimension, id: \.self) { k in
+                    let a = matrixA.values[resultRow][k] ?? 0
+                    let b = matrixB.values[k][resultCol] ?? 0
+                    let product = a * b
 
-                // Show each multiplication
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(0..<sharedDimension, id: \.self) { k in
-                        let a = matrixA.values[resultRow][k] ?? 0
-                        let b = matrixB.values[k][resultCol] ?? 0
-                        let product = a * b
-
-                        HStack {
-                            Text("\(a)")
-                                .foregroundColor(.blue)
-                                .fontWeight(.medium)
-                            Text("×")
-                            Text("\(b)")
-                                .foregroundColor(.purple)
-                                .fontWeight(.medium)
-                            Text("=")
-                            Text("\(product)")
-                                .fontWeight(.medium)
-                        }
-                        .font(.system(.body, design: .rounded))
-                    }
-                }
-
-                Divider()
-
-                // Show the sum
-                HStack {
-                    Text(products.map { String($0) }.joined(separator: " + "))
-                        .font(.system(.caption, design: .rounded))
-                    Text("=")
-                    Text("\(resultValue)")
-                        .font(.headline)
-                        .foregroundColor(.green)
-                }
-
-                // Animate button
-                HStack(spacing: 12) {
-                    Button(action: onAnimateAllTapped) {
-                        Image(systemName: "list.number")
-                            .font(.subheadline)
+                    HStack(spacing: 4) {
+                        Text("\(a)")
+                            .foregroundColor(.blue)
                             .fontWeight(.medium)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.orange.opacity(0.85))
-                            .cornerRadius(8)
+                        Text("×")
+                            .foregroundColor(.secondary)
+                        Text("\(b)")
+                            .foregroundColor(.purple)
+                            .fontWeight(.medium)
+                        Text("=")
+                            .foregroundColor(.secondary)
+                        Text("\(product)")
+                            .fontWeight(.medium)
                     }
-                    .disabled(isAnimatingSequence)
+                    .font(.system(.callout, design: .rounded))
+                }
+            }
 
-                    Button(action: onAnimateTapped) {
-                        HStack {
-                            Image(systemName: "play.fill")
-                            Text("Animate")
-                        }
-                        .font(.subheadline)
+            Divider()
+
+            // Show the sum
+            HStack(spacing: 4) {
+                Text(products.map { String($0) }.joined(separator: "+"))
+                    .font(.system(.caption2, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                Text("=")
+                Text("\(resultValue)")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.green)
+            }
+
+            // Animate buttons
+            HStack(spacing: 8) {
+                Button(action: onAnimateAllTapped) {
+                    Image(systemName: "list.number")
+                        .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.orange)
-                        .cornerRadius(8)
-                    }
-                    .disabled(isAnimatingSequence)
-
-                    Button(action: onAnimateRandomTapped) {
-                        Image(systemName: "shuffle")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.orange.opacity(0.85))
-                            .cornerRadius(8)
-                    }
-                    .disabled(isAnimatingSequence)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.orange.opacity(0.85))
+                        .cornerRadius(6)
                 }
-                .padding(.top, 8)
+                .disabled(isAnimatingSequence)
+
+                Button(action: onAnimateTapped) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "play.fill")
+                        Text("Animate")
+                    }
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.orange)
+                    .cornerRadius(6)
+                }
+                .disabled(isAnimatingSequence)
+
+                Button(action: onAnimateRandomTapped) {
+                    Image(systemName: "shuffle")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.orange.opacity(0.85))
+                        .cornerRadius(6)
+                }
+                .disabled(isAnimatingSequence)
             }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.orange.opacity(0.1))
-                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
-            )
+            .padding(.top, 4)
         }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.orange.opacity(0.1))
+                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+        )
     }
 }
 

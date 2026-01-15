@@ -169,63 +169,119 @@ struct ContentView: View {
                                 .foregroundColor(.orange)
                         }
 
-                        // Calculation Breakdown
-                        if let result = result,
-                           let selectedRow = selectedResultRow,
-                           let selectedCol = selectedResultCol {
-                            CalculationBreakdownView(
-                                matrixA: matrixA,
-                                matrixB: matrixB,
-                                resultRow: selectedRow,
-                                resultCol: selectedCol,
-                                resultValue: result[selectedRow][selectedCol],
-                                onAnimateTapped: {
-                                    animationSelectedRow = selectedRow
-                                    animationSelectedCol = selectedCol
-                                    animationResultValue = result[selectedRow][selectedCol]
-                                    animationResultCellFrame = resultCellPositions.first {
-                                        $0.id.row == selectedRow && $0.id.col == selectedCol
-                                    }?.frame
-                                    animationRunId = UUID()
-                                    showingAnimation = true
-                                },
-                                onAnimateAllTapped: {
-                                    startSequentialAnimation()
-                                },
-                                onAnimateRandomTapped: {
-                                    startRandomAnimation()
-                                },
-                                isAnimatingSequence: isAnimatingSequence || result == nil
-                            )
-                            .transition(.scale.combined(with: .opacity))
-                            .frame(maxWidth: contentWidth)
-                        }
-
-                        // Result
+                        // Calculation Breakdown and Result
                         if let result = result {
-                            VStack(spacing: 8) {
-                                Text("Result [\(matrixA.rows)×\(matrixB.cols)]")
-                                    .font(.headline)
-                                Text("Tap a cell to see how it was calculated")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                ResultMatrixView(
-                                    values: result,
-                                    selectedRow: selectedResultRow,
-                                    selectedCol: selectedResultCol
-                                ) { row, col in
-                                    if selectedResultRow == row && selectedResultCol == col {
-                                        // Deselect if tapping same cell
-                                        selectedResultRow = nil
-                                        selectedResultCol = nil
-                                    } else {
-                                        selectedResultRow = row
-                                        selectedResultCol = col
+                            if horizontalSizeClass == .regular {
+                                // iPad: side by side layout
+                                HStack(alignment: .top, spacing: 24) {
+                                    // Calculation breakdown on left
+                                    if let selectedRow = selectedResultRow,
+                                       let selectedCol = selectedResultCol {
+                                        CalculationBreakdownView(
+                                            matrixA: matrixA,
+                                            matrixB: matrixB,
+                                            resultRow: selectedRow,
+                                            resultCol: selectedCol,
+                                            resultValue: result[selectedRow][selectedCol],
+                                            onAnimateTapped: {
+                                                animationSelectedRow = selectedRow
+                                                animationSelectedCol = selectedCol
+                                                animationResultValue = result[selectedRow][selectedCol]
+                                                animationResultCellFrame = resultCellPositions.first {
+                                                    $0.id.row == selectedRow && $0.id.col == selectedCol
+                                                }?.frame
+                                                animationRunId = UUID()
+                                                showingAnimation = true
+                                            },
+                                            onAnimateAllTapped: {
+                                                startSequentialAnimation()
+                                            },
+                                            onAnimateRandomTapped: {
+                                                startRandomAnimation()
+                                            },
+                                            isAnimatingSequence: isAnimatingSequence
+                                        )
+                                        .frame(maxWidth: 280)
+                                    }
+
+                                    // Result matrix on right
+                                    VStack(spacing: 8) {
+                                        Text("Result [\(matrixA.rows)×\(matrixB.cols)]")
+                                            .font(.headline)
+                                        Text("Tap a cell to see how it was calculated")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        ResultMatrixView(
+                                            values: result,
+                                            selectedRow: selectedResultRow,
+                                            selectedCol: selectedResultCol
+                                        ) { row, col in
+                                            if selectedResultRow == row && selectedResultCol == col {
+                                                selectedResultRow = nil
+                                                selectedResultCol = nil
+                                            } else {
+                                                selectedResultRow = row
+                                                selectedResultCol = col
+                                            }
+                                        }
                                     }
                                 }
+                                .transition(.scale.combined(with: .opacity))
+                            } else {
+                                // iPhone: stacked layout
+                                if let selectedRow = selectedResultRow,
+                                   let selectedCol = selectedResultCol {
+                                    CalculationBreakdownView(
+                                        matrixA: matrixA,
+                                        matrixB: matrixB,
+                                        resultRow: selectedRow,
+                                        resultCol: selectedCol,
+                                        resultValue: result[selectedRow][selectedCol],
+                                        onAnimateTapped: {
+                                            animationSelectedRow = selectedRow
+                                            animationSelectedCol = selectedCol
+                                            animationResultValue = result[selectedRow][selectedCol]
+                                            animationResultCellFrame = resultCellPositions.first {
+                                                $0.id.row == selectedRow && $0.id.col == selectedCol
+                                            }?.frame
+                                            animationRunId = UUID()
+                                            showingAnimation = true
+                                        },
+                                        onAnimateAllTapped: {
+                                            startSequentialAnimation()
+                                        },
+                                        onAnimateRandomTapped: {
+                                            startRandomAnimation()
+                                        },
+                                        isAnimatingSequence: isAnimatingSequence
+                                    )
+                                    .transition(.scale.combined(with: .opacity))
+                                    .frame(maxWidth: contentWidth)
+                                }
+
+                                VStack(spacing: 8) {
+                                    Text("Result [\(matrixA.rows)×\(matrixB.cols)]")
+                                        .font(.headline)
+                                    Text("Tap a cell to see how it was calculated")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    ResultMatrixView(
+                                        values: result,
+                                        selectedRow: selectedResultRow,
+                                        selectedCol: selectedResultCol
+                                    ) { row, col in
+                                        if selectedResultRow == row && selectedResultCol == col {
+                                            selectedResultRow = nil
+                                            selectedResultCol = nil
+                                        } else {
+                                            selectedResultRow = row
+                                            selectedResultCol = col
+                                        }
+                                    }
+                                }
+                                .transition(.scale.combined(with: .opacity))
+                                .frame(maxWidth: contentWidth)
                             }
-                            .transition(.scale.combined(with: .opacity))
-                            .frame(maxWidth: contentWidth)
                         }
 
                         // Reset Button
@@ -449,6 +505,9 @@ struct ContentView: View {
         }
 
         result = resultMatrix
+        // Auto-select first cell so calculation breakdown is visible
+        selectedResultRow = 0
+        selectedResultCol = 0
     }
 
     private func regenerateMatrices() {

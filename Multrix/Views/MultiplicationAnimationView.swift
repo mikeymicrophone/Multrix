@@ -88,6 +88,15 @@ enum AnimationSpeed: Int, CaseIterable, Equatable {
     case fast
     case fastest
 
+    var title: String {
+        switch self {
+        case .slow: return "Slow"
+        case .normal: return "Normal"
+        case .fast: return "Fast"
+        case .fastest: return "Turbo"
+        }
+    }
+
     var flyOutFactor: Double { phaseFactor }
     var flyOutDelayFactor: Double { delayFactor }
     var alignFactor: Double { phaseFactor }
@@ -187,6 +196,7 @@ struct MultiplicationAnimationOverlay: View {
     let finalSum: Int
     let resultCellFrame: CGRect?
     let speed: AnimationSpeed
+    @Binding var isPaused: Bool
     let onResultPlaced: ((CGRect, Int) -> Void)?
     let onAnimationFinished: (() -> Void)?
 
@@ -194,6 +204,7 @@ struct MultiplicationAnimationOverlay: View {
     @State private var visibleProductCount: Int = 0  // How many products are visible (for sequential reveal)
     @State private var collapsedCount: Int = 0  // How many products have collapsed into running sum
     @State private var timing = AnimationTiming()
+    @State private var animationTask: Task<Void, Never>? = nil
 
     // Separate the cells into row (from A) and column (from B)
     private var rowCells: [AnimatedCellData] {
@@ -274,7 +285,13 @@ struct MultiplicationAnimationOverlay: View {
             .allowsHitTesting(false)
         }
         .onAppear {
-            startAnimation()
+            animationTask?.cancel()
+            animationTask = Task { @MainActor in
+                await runAnimation()
+            }
+        }
+        .onDisappear {
+            animationTask?.cancel()
         }
     }
 
@@ -553,87 +570,83 @@ struct MultiplicationAnimationOverlay: View {
 
     // MARK: - Animation Control
 
-    private func startAnimation() {
+    private func runAnimation() async {
         guard count > 0 else { return }
         let adjustedTiming = timing.scaled(for: speed)
         var totalDelay: Double = adjustedTiming.flyOutDelay
 
         // Phase 1: Fly out
-        withAnimation(.easeInOut(duration: adjustedTiming.flyOutDuration).delay(totalDelay)) {
+        await pauseAwareSleep(seconds: totalDelay)
+        withAnimation(.easeInOut(duration: adjustedTiming.flyOutDuration)) {
             phase = .flyOut
         }
-        totalDelay += adjustedTiming.flyOutDuration + adjustedTiming.alignDelay
+        await pauseAwareSleep(seconds: adjustedTiming.flyOutDuration + adjustedTiming.alignDelay)
 
         // Phase 2: Align (skipped since flyOut goes directly to aligned position)
-        withAnimation(.easeInOut(duration: adjustedTiming.alignDuration).delay(totalDelay)) {
+        withAnimation(.easeInOut(duration: adjustedTiming.alignDuration)) {
             phase = .align
         }
-        totalDelay += adjustedTiming.alignDuration + adjustedTiming.pairDelay
+        await pauseAwareSleep(seconds: adjustedTiming.alignDuration + adjustedTiming.pairDelay)
 
         // Phase 3: Pair
-        withAnimation(.easeInOut(duration: adjustedTiming.pairDuration).delay(totalDelay)) {
+        withAnimation(.easeInOut(duration: adjustedTiming.pairDuration)) {
             phase = .pair
         }
-        totalDelay += adjustedTiming.pairDuration + adjustedTiming.productRevealDelay
+        await pauseAwareSleep(seconds: adjustedTiming.pairDuration + adjustedTiming.productRevealDelay)
 
         // Phase 4: Multiply - reveal products sequentially
-        withAnimation(.easeInOut(duration: 0.1).delay(totalDelay)) {
+        withAnimation(.easeInOut(duration: 0.1)) {
             phase = .multiply
         }
 
         // Reveal each product one at a time
         for i in 0..<count {
-            let productDelay = totalDelay + Double(i) * adjustedTiming.productRevealDelay
-            withAnimation(.easeInOut(duration: adjustedTiming.productRevealDuration).delay(productDelay)) {
+            await pauseAwareSleep(seconds: adjustedTiming.productRevealDelay)
+            withAnimation(.easeInOut(duration: adjustedTiming.productRevealDuration)) {
                 visibleProductCount = i + 1
             }
         }
-        totalDelay += Double(count) * adjustedTiming.productRevealDelay + adjustedTiming.collapseDelay
+        await pauseAwareSleep(seconds: adjustedTiming.productRevealDuration)
+        await pauseAwareSleep(seconds: adjustedTiming.collapseDelay)
 
         // Phase 5: Collapse - sequential sum animation
-        withAnimation(.easeInOut(duration: 0.1).delay(totalDelay)) {
+        withAnimation(.easeInOut(duration: 0.1)) {
             phase = .collapse
         }
 
         // Each product (starting from index 1) moves up and merges into running sum
         if count > 1 {
             for i in 1..<count {
-                let collapseStepDelay = totalDelay + Double(i - 1) * adjustedTiming.collapseStepDelay
-                withAnimation(.easeInOut(duration: adjustedTiming.collapseDuration).delay(collapseStepDelay)) {
+                await pauseAwareSleep(seconds: adjustedTiming.collapseStepDelay)
+                withAnimation(.easeInOut(duration: adjustedTiming.collapseDuration)) {
                     collapsedCount = i
                 }
             }
+            await pauseAwareSleep(seconds: adjustedTiming.collapseDuration)
         }
-        totalDelay += Double(max(0, count - 1)) * adjustedTiming.collapseStepDelay + adjustedTiming.sumDelay
+        await pauseAwareSleep(seconds: adjustedTiming.sumDelay)
 
         // Phase 6: Sum
-        withAnimation(.easeInOut(duration: adjustedTiming.sumDuration).delay(totalDelay)) {
+        withAnimation(.easeInOut(duration: adjustedTiming.sumDuration)) {
             phase = .sum
         }
-        totalDelay += adjustedTiming.sumDuration + 0.3
+        await pauseAwareSleep(seconds: adjustedTiming.sumDuration + 0.3)
 
         // Phase 7: Complete
-        withAnimation(.easeInOut(duration: 0.2).delay(totalDelay)) {
+        withAnimation(.easeInOut(duration: 0.2)) {
             phase = .complete
         }
-        totalDelay += 0.2 + adjustedTiming.flyToResultDelay
+        await pauseAwareSleep(seconds: 0.2 + adjustedTiming.flyToResultDelay)
 
         // Phase 8: Fly to result cell
-        let flyToResultStart = totalDelay
-        withAnimation(.easeInOut(duration: adjustedTiming.flyToResultDuration).delay(totalDelay)) {
+        if let frame = resultCellFrame {
+            onResultPlaced?(frame, finalSum)
+        }
+        withAnimation(.easeInOut(duration: adjustedTiming.flyToResultDuration)) {
             phase = .flyToResult
         }
-        if let frame = resultCellFrame {
-            DispatchQueue.main.asyncAfter(deadline: .now() + flyToResultStart) {
-                onResultPlaced?(frame, finalSum)
-            }
-        }
-        let finishDelay = flyToResultStart + adjustedTiming.flyToResultDuration
-        if let onAnimationFinished {
-            DispatchQueue.main.asyncAfter(deadline: .now() + finishDelay) {
-                onAnimationFinished()
-            }
-        }
+        await pauseAwareSleep(seconds: adjustedTiming.flyToResultDuration)
+        onAnimationFinished?()
     }
 
     static func totalDuration(count: Int, speed: AnimationSpeed) -> Double {
@@ -643,15 +656,43 @@ struct MultiplicationAnimationOverlay: View {
         var totalDelay: Double = timing.flyOutDelay
         totalDelay += timing.flyOutDuration + timing.alignDelay
         totalDelay += timing.alignDuration + timing.pairDelay
-        totalDelay += timing.pairDuration + timing.productRevealDelay
-        totalDelay += Double(count) * timing.productRevealDelay + timing.collapseDelay
-        totalDelay += Double(max(0, count - 1)) * timing.collapseStepDelay + timing.sumDelay
+        totalDelay += timing.pairDuration
+        totalDelay += Double(count) * timing.productRevealDelay + timing.productRevealDuration
+        totalDelay += timing.collapseDelay
+        if count > 1 {
+            totalDelay += Double(max(0, count - 2)) * timing.collapseStepDelay
+            totalDelay += timing.collapseDuration
+        }
+        totalDelay += timing.sumDelay
         totalDelay += timing.sumDuration + 0.3
         totalDelay += 0.2 + timing.flyToResultDelay
         totalDelay += timing.flyToResultDuration
         return totalDelay
     }
 
+    private func pauseAwareSleep(seconds: Double) async {
+        guard seconds > 0 else { return }
+        var remaining = seconds
+        let step = 0.05
+        while remaining > 0 {
+            if Task.isCancelled { return }
+            if isPaused {
+                await pauseUntilResumed()
+            } else {
+                let slice = min(step, remaining)
+                let nanos = UInt64(slice * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: nanos)
+                remaining -= slice
+            }
+        }
+    }
+
+    private func pauseUntilResumed() async {
+        while isPaused {
+            if Task.isCancelled { return }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+    }
 }
 
 // MARK: - Preview
@@ -672,6 +713,7 @@ struct MultiplicationAnimationOverlay: View {
             finalSum: 23,
             resultCellFrame: CGRect(x: 100, y: 400, width: 50, height: 50),
             speed: .normal,
+            isPaused: .constant(false),
             onResultPlaced: nil,
             onAnimationFinished: nil
         )

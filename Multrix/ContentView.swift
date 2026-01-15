@@ -33,9 +33,11 @@ struct ContentView: View {
     @State private var animationSelectedCol: Int? = nil
     @State private var animationResultValue: Int? = nil
     @State private var animationResultCellFrame: CGRect? = nil
-    @State private var resultStamps: [ResultCellIdentifier: ResultStamp] = [:]
+    @State private var resultStamps: [ResultCellIdentifier: Int] = [:]
     @State private var isAnimatingSequence = false
+    @State private var isSequencePaused = false
     @State private var animationSpeed: AnimationSpeed = .normal
+    @State private var sequenceTask: Task<Void, Never>? = nil
     @State private var cellPositions: [CellPositionData] = []
     @State private var resultCellPositions: [ResultCellPositionData] = []
     @State private var animationTargetArea: CGRect = .zero
@@ -160,6 +162,37 @@ struct ContentView: View {
                                 .foregroundColor(.orange)
                         }
 
+                        HStack(spacing: 16) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Speed")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Picker("Speed", selection: $animationSpeed) {
+                                    ForEach(AnimationSpeed.allCases, id: \.self) { speed in
+                                        Text(speed.title).tag(speed)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                            }
+
+                            Button(action: {
+                                isSequencePaused.toggle()
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: isSequencePaused ? "play.fill" : "pause.fill")
+                                    Text(isSequencePaused ? "Resume" : "Pause")
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(isAnimatingSequence ? Color.orange : Color.gray.opacity(0.4))
+                                .cornerRadius(8)
+                            }
+                            .disabled(!isAnimatingSequence)
+                        }
+                        .frame(maxWidth: contentWidth, alignment: .leading)
+
                         // Calculation Breakdown
                         if let result = result,
                            let selectedRow = selectedResultRow,
@@ -186,7 +219,7 @@ struct ContentView: View {
                                 onAnimateRandomTapped: {
                                     startRandomAnimation()
                                 },
-                                isAnimatingSequence: isAnimatingSequence
+                                isAnimatingSequence: isAnimatingSequence || result == nil
                             )
                             .transition(.scale.combined(with: .opacity))
                             .frame(maxWidth: contentWidth)
@@ -232,6 +265,7 @@ struct ContentView: View {
                     }
                     .padding()
                 }
+                .scrollDisabled(showingAnimation || isAnimatingSequence)
                 .coordinateSpace(name: MatrixCoordinateSpace.name)
                 .onPreferenceChange(CellPositionPreferenceKey.self) { positions in
                     cellPositions = positions
@@ -253,9 +287,10 @@ struct ContentView: View {
                         finalSum: finalSum,
                         resultCellFrame: animationResultCellFrame,
                         speed: animationSpeed,
+                        isPaused: $isSequencePaused,
                         onResultPlaced: { frame, value in
                             let id = ResultCellIdentifier(row: selectedRow, col: selectedCol)
-                            resultStamps[id] = ResultStamp(id: id, frame: frame, value: value)
+                            resultStamps[id] = value
                         },
                         onAnimationFinished: {
                             showingAnimation = false
@@ -265,14 +300,11 @@ struct ContentView: View {
                     .allowsHitTesting(false)
                 }
 
-                ForEach(resultStamps.values.sorted(by: { lhs, rhs in
-                    if lhs.id.row != rhs.id.row {
-                        return lhs.id.row < rhs.id.row
+                ForEach(sortedResultStampIds, id: \.self) { id in
+                    if let frame = resultCellFrame(for: id), let value = resultStamps[id] {
+                        resultStampView(id: id, frame: frame, value: value)
+                            .allowsHitTesting(false)
                     }
-                    return lhs.id.col < rhs.id.col
-                })) { stamp in
-                    resultStampView(stamp)
-                        .allowsHitTesting(false)
                 }
 
                 // Number input overlay
@@ -369,54 +401,83 @@ struct ContentView: View {
     }
 
     private func regenerateMatrices() {
+        sequenceTask?.cancel()
         matrixA = Matrix(rows: rowsA, cols: shared)
         matrixB = Matrix(rows: shared, cols: colsB)
         result = nil
         selectedResultRow = nil
         selectedResultCol = nil
+        animationSelectedRow = nil
+        animationSelectedCol = nil
+        animationResultValue = nil
+        animationResultCellFrame = nil
+        showingAnimation = false
         resultStamps = [:]
         isAnimatingSequence = false
+        isSequencePaused = false
     }
 
     private func reset() {
+        sequenceTask?.cancel()
         matrixA = Matrix(rows: rowsA, cols: shared)
         matrixB = Matrix(rows: shared, cols: colsB)
         result = nil
         selectedResultRow = nil
         selectedResultCol = nil
+        animationSelectedRow = nil
+        animationSelectedCol = nil
+        animationResultValue = nil
+        animationResultCellFrame = nil
+        showingAnimation = false
         resultStamps = [:]
         isAnimatingSequence = false
+        isSequencePaused = false
     }
 
-    private func resultStampView(_ stamp: ResultStamp) -> some View {
-        Text("\(stamp.value)")
+    private func resultStampView(id: ResultCellIdentifier, frame: CGRect, value: Int) -> some View {
+        Text("\(value)")
             .font(.system(size: 16, weight: .bold, design: .rounded))
             .foregroundColor(.white)
             .frame(width: 50, height: 50)
             .background(RoundedRectangle(cornerRadius: 6).fill(Color.green.opacity(0.9)))
             .scaleEffect(0.9)
-            .position(x: stamp.frame.midX, y: stamp.frame.midY)
+            .position(x: frame.midX, y: frame.midY)
     }
 
-    private struct ResultStamp: Identifiable {
-        let id: ResultCellIdentifier
-        let frame: CGRect
-        let value: Int
+    private var sortedResultStampIds: [ResultCellIdentifier] {
+        resultStamps.keys.sorted { lhs, rhs in
+            if lhs.row != rhs.row {
+                return lhs.row < rhs.row
+            }
+            return lhs.col < rhs.col
+        }
+    }
+
+    private func resultCellFrame(for id: ResultCellIdentifier) -> CGRect? {
+        resultCellPositions.first { $0.id.row == id.row && $0.id.col == id.col }?.frame
     }
 
     private func startSequentialAnimation() {
         guard !isAnimatingSequence else { return }
         guard let result else { return }
         isAnimatingSequence = true
-        Task { @MainActor in
+        sequenceTask?.cancel()
+        sequenceTask = Task { @MainActor in
             let rows = result.count
             let cols = result.first?.count ?? 0
             for row in 0..<rows {
                 for col in 0..<cols {
+                    if resultStamps[ResultCellIdentifier(row: row, col: col)] != nil {
+                        continue
+                    }
+                    await waitForSequenceResume()
                     await animateResultCell(row: row, col: col, result: result)
+                    if Task.isCancelled { break }
                 }
+                if Task.isCancelled { break }
             }
             isAnimatingSequence = false
+            isSequencePaused = false
         }
     }
 
@@ -424,7 +485,8 @@ struct ContentView: View {
         guard !isAnimatingSequence else { return }
         guard let result else { return }
         isAnimatingSequence = true
-        Task { @MainActor in
+        sequenceTask?.cancel()
+        sequenceTask = Task { @MainActor in
             let rows = result.count
             let cols = result.first?.count ?? 0
             var ids: [ResultCellIdentifier] = []
@@ -436,9 +498,15 @@ struct ContentView: View {
             }
             ids.shuffle()
             for id in ids {
+                if resultStamps[id] != nil {
+                    continue
+                }
+                await waitForSequenceResume()
                 await animateResultCell(row: id.row, col: id.col, result: result)
+                if Task.isCancelled { break }
             }
             isAnimatingSequence = false
+            isSequencePaused = false
         }
     }
 
@@ -458,8 +526,8 @@ struct ContentView: View {
         let count = matrixA.cols
         let duration = MultiplicationAnimationOverlay.totalDuration(count: count, speed: animationSpeed)
         let buffer: Double = 0.15
-        let nanos = UInt64((duration + buffer) * 1_000_000_000)
-        try? await Task.sleep(nanoseconds: nanos)
+        let total = duration + buffer
+        await waitWhilePaused(totalDuration: total)
     }
 
     private func waitForAnimationData(row: Int, col: Int) async {
@@ -478,6 +546,27 @@ struct ContentView: View {
         let colCount = cellPositions.filter { $0.id.matrix == 1 && $0.id.col == col }.count
         let resultFrameAvailable = resultCellPositions.contains { $0.id.row == row && $0.id.col == col }
         return rowCount == matrixA.cols && colCount == matrixB.rows && resultFrameAvailable
+    }
+
+    private func waitForSequenceResume() async {
+        while isSequencePaused {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+    }
+
+    private func waitWhilePaused(totalDuration: Double) async {
+        let step: Double = 0.1
+        var remaining = totalDuration
+        while remaining > 0 {
+            if isSequencePaused {
+                await waitForSequenceResume()
+            } else {
+                let slice = min(step, remaining)
+                let nanos = UInt64(slice * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: nanos)
+                remaining -= slice
+            }
+        }
     }
 }
 

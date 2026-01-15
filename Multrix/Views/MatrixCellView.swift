@@ -58,6 +58,8 @@ struct MatrixCellView: View {
                 Text("\(val)")
                     .font(.title2)
                     .fontWeight(.medium)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .foregroundColor(isHighlighted ? .orange : .primary)
             } else {
                 Text("?")

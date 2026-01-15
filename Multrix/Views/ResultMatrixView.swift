@@ -30,6 +30,7 @@ struct ResultMatrixView: View {
                             Text("\(values[row][col])")
                                 .font(.system(size: 14))
                                 .fontWeight(.medium)
+                                .lineLimit(1)
                                 .minimumScaleFactor(0.5)
                         }
                         .frame(width: 50, height: 50)

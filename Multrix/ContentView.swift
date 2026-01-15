@@ -39,6 +39,10 @@ struct ContentView: View {
     @State private var additionMode: AdditionMode = .collapse
     @State private var numberComplexity: NumberComplexity = .moderate
     @State private var showingPreferences = false
+    @State private var pendingRowsA: Int = 4
+    @State private var pendingShared: Int = 4
+    @State private var pendingColsB: Int = 4
+    @State private var pendingComplexity: NumberComplexity = .moderate
     @State private var sequenceTask: Task<Void, Never>? = nil
     @State private var cellPositions: [CellPositionData] = []
     @State private var resultCellPositions: [ResultCellPositionData] = []
@@ -57,7 +61,28 @@ struct ContentView: View {
                     VStack(spacing: 24) {
                         HStack {
                             Spacer()
-                            Button(action: { showingPreferences = true }) {
+
+                            // Pause button - only visible during animation
+                            if isAnimatingSequence || showingAnimation {
+                                Button(action: {
+                                    isSequencePaused.toggle()
+                                }) {
+                                    Image(systemName: isSequencePaused ? "play.fill" : "pause.fill")
+                                        .font(.title3)
+                                        .foregroundColor(.white)
+                                        .padding(8)
+                                        .background(Color.orange)
+                                        .clipShape(Circle())
+                                }
+                            }
+
+                            Button(action: {
+                                pendingRowsA = rowsA
+                                pendingShared = shared
+                                pendingColsB = colsB
+                                pendingComplexity = numberComplexity
+                                showingPreferences = true
+                            }) {
                                 Image(systemName: "gearshape")
                                     .font(.title3)
                                     .foregroundColor(.blue)
@@ -70,12 +95,6 @@ struct ContentView: View {
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .padding(.top)
-
-                        Text("Tap the blue cell in each matrix to enter the missing number")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
 
                         // Input Matrices
                         if horizontalSizeClass == .regular {
@@ -132,13 +151,12 @@ struct ContentView: View {
                         // Calculate Button
                         Button(action: calculateResult) {
                             HStack {
-                                Image(systemName: "equal")
-                                Text("Calculate Result")
+                                Text("Multiply")
                             }
                             .font(.headline)
                             .foregroundColor(.white)
                             .padding()
-                            .frame(maxWidth: contentWidth)
+//                            .frame(maxWidth: contentWidth/2)
                             .background(canCalculate ? Color.blue : Color.gray)
                             .cornerRadius(12)
                         }
@@ -150,25 +168,6 @@ struct ContentView: View {
                                 .font(.caption)
                                 .foregroundColor(.orange)
                         }
-
-                        HStack(spacing: 16) {
-                            Button(action: {
-                                isSequencePaused.toggle()
-                            }) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: isSequencePaused ? "play.fill" : "pause.fill")
-                                    Text(isSequencePaused ? "Resume" : "Pause")
-                                }
-                                .font(.subheadline)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(isAnimatingSequence ? Color.orange : Color.gray.opacity(0.4))
-                                .cornerRadius(8)
-                            }
-                            .disabled(!isAnimatingSequence)
-                        }
-                        .frame(maxWidth: contentWidth, alignment: .leading)
 
                         // Calculation Breakdown
                         if let result = result,
@@ -316,33 +315,46 @@ struct ContentView: View {
         .animation(.easeInOut, value: selectedResultRow)
         .animation(.easeInOut, value: selectedResultCol)
         .animation(.easeInOut, value: showingAnimation)
-        .sheet(isPresented: $showingPreferences) {
+        .animation(.easeInOut, value: isAnimatingSequence)
+        .sheet(isPresented: $showingPreferences, onDismiss: {
+            // Apply changes if dimensions or complexity changed
+            let dimensionsChanged = pendingRowsA != rowsA || pendingShared != shared || pendingColsB != colsB
+            let complexityChanged = pendingComplexity != numberComplexity
+
+            if dimensionsChanged || complexityChanged {
+                rowsA = pendingRowsA
+                shared = pendingShared
+                colsB = pendingColsB
+                numberComplexity = pendingComplexity
+                regenerateMatrices()
+            }
+        }) {
             NavigationStack {
                 Form {
-                    Section("Matrix Dimensions") {
+                    Section {
                         DimensionPickerView(
-                            rowsA: $rowsA,
-                            shared: $shared,
-                            colsB: $colsB
-                        ) {
-                            regenerateMatrices()
-                        }
+                            rowsA: $pendingRowsA,
+                            shared: $pendingShared,
+                            colsB: $pendingColsB
+                        )
+                    } header: {
+                        Text("Matrix Dimensions")
+                    } footer: {
+                        Text("A[\(pendingRowsA)×\(pendingShared)] × B[\(pendingShared)×\(pendingColsB)] = Result[\(pendingRowsA)×\(pendingColsB)]")
                     }
 
                     Section {
-                        Picker("Complexity", selection: $numberComplexity) {
+                        Picker("Complexity", selection: $pendingComplexity) {
                             ForEach(NumberComplexity.allCases, id: \.self) { complexity in
                                 Text(complexity.title).tag(complexity)
                             }
                         }
                         .pickerStyle(.segmented)
-                        Text(numberComplexity.description)
+                        Text(pendingComplexity.description)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     } header: {
                         Text("Number Complexity")
-                    } footer: {
-                        Text("Changes apply to new matrices")
                     }
 
                     Section("Animation Speed") {
@@ -372,6 +384,7 @@ struct ContentView: View {
                     }
                 }
             }
+            .interactiveDismissDisabled()
         }
     }
 
@@ -474,8 +487,10 @@ struct ContentView: View {
 
     private func resultStampView(id: ResultCellIdentifier, frame: CGRect, value: Int) -> some View {
         Text("\(value)")
-            .font(.system(size: 16, weight: .bold, design: .rounded))
+            .font(.system(size: 14, weight: .bold, design: .rounded))
             .foregroundColor(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
             .frame(width: 50, height: 50)
             .background(RoundedRectangle(cornerRadius: 6).fill(Color.green.opacity(0.9)))
             .scaleEffect(0.9)

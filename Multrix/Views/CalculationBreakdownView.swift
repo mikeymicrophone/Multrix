@@ -14,6 +14,9 @@ struct CalculationBreakdownView: View {
     let resultCol: Int
     let resultValue: Int
     let onAnimateTapped: () -> Void
+    let onAnimateAllTapped: () -> Void
+    let onAnimateRandomTapped: () -> Void
+    let isAnimatingSequence: Bool
 
     // The shared dimension (cols of A = rows of B)
     private var sharedDimension: Int { matrixA.cols }
@@ -72,18 +75,45 @@ struct CalculationBreakdownView: View {
                 }
 
                 // Animate button
-                Button(action: onAnimateTapped) {
-                    HStack {
-                        Image(systemName: "play.fill")
-                        Text("Animate")
+                HStack(spacing: 12) {
+                    Button(action: onAnimateAllTapped) {
+                        Image(systemName: "list.number")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.orange.opacity(0.85))
+                            .cornerRadius(8)
                     }
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color.orange)
-                    .cornerRadius(8)
+                    .disabled(isAnimatingSequence)
+
+                    Button(action: onAnimateTapped) {
+                        HStack {
+                            Image(systemName: "play.fill")
+                            Text("Animate")
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.orange)
+                        .cornerRadius(8)
+                    }
+                    .disabled(isAnimatingSequence)
+
+                    Button(action: onAnimateRandomTapped) {
+                        Image(systemName: "shuffle")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.orange.opacity(0.85))
+                            .cornerRadius(8)
+                    }
+                    .disabled(isAnimatingSequence)
                 }
                 .padding(.top, 8)
             }
@@ -104,6 +134,9 @@ struct CalculationBreakdownView: View {
         resultRow: 0,
         resultCol: 0,
         resultValue: 100,
-        onAnimateTapped: {}
+        onAnimateTapped: {},
+        onAnimateAllTapped: {},
+        onAnimateRandomTapped: {},
+        isAnimatingSequence: false
     )
 }

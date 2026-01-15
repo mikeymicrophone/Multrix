@@ -40,12 +40,12 @@ struct ResultMatrixView: View {
                             GeometryReader { geo in
                                 Color.clear.preference(
                                     key: ResultCellPositionPreferenceKey.self,
-                                    value: isSelected ? [
+                                    value: [
                                         ResultCellPositionData(
                                             id: ResultCellIdentifier(row: row, col: col),
                                             frame: geo.frame(in: .named(MatrixCoordinateSpace.name))
                                         )
-                                    ] : []
+                                    ]
                                 )
                             }
                         )

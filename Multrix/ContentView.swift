@@ -34,6 +34,8 @@ struct ContentView: View {
     @State private var animationResultValue: Int? = nil
     @State private var animationResultCellFrame: CGRect? = nil
     @State private var resultStamps: [ResultCellIdentifier: ResultStamp] = [:]
+    @State private var isAnimatingSequence = false
+    @State private var animationSpeed: AnimationSpeed = .normal
     @State private var cellPositions: [CellPositionData] = []
     @State private var resultCellPositions: [ResultCellPositionData] = []
     @State private var animationTargetArea: CGRect = .zero
@@ -177,7 +179,14 @@ struct ContentView: View {
                                     }?.frame
                                     animationRunId = UUID()
                                     showingAnimation = true
-                                }
+                                },
+                                onAnimateAllTapped: {
+                                    startSequentialAnimation()
+                                },
+                                onAnimateRandomTapped: {
+                                    startRandomAnimation()
+                                },
+                                isAnimatingSequence: isAnimatingSequence
                             )
                             .transition(.scale.combined(with: .opacity))
                             .frame(maxWidth: contentWidth)
@@ -243,6 +252,7 @@ struct ContentView: View {
                         selectedCol: selectedCol,
                         finalSum: finalSum,
                         resultCellFrame: animationResultCellFrame,
+                        speed: animationSpeed,
                         onResultPlaced: { frame, value in
                             let id = ResultCellIdentifier(row: selectedRow, col: selectedCol)
                             resultStamps[id] = ResultStamp(id: id, frame: frame, value: value)
@@ -365,6 +375,7 @@ struct ContentView: View {
         selectedResultRow = nil
         selectedResultCol = nil
         resultStamps = [:]
+        isAnimatingSequence = false
     }
 
     private func reset() {
@@ -374,6 +385,7 @@ struct ContentView: View {
         selectedResultRow = nil
         selectedResultCol = nil
         resultStamps = [:]
+        isAnimatingSequence = false
     }
 
     private func resultStampView(_ stamp: ResultStamp) -> some View {
@@ -390,6 +402,82 @@ struct ContentView: View {
         let id: ResultCellIdentifier
         let frame: CGRect
         let value: Int
+    }
+
+    private func startSequentialAnimation() {
+        guard !isAnimatingSequence else { return }
+        guard let result else { return }
+        isAnimatingSequence = true
+        Task { @MainActor in
+            let rows = result.count
+            let cols = result.first?.count ?? 0
+            for row in 0..<rows {
+                for col in 0..<cols {
+                    await animateResultCell(row: row, col: col, result: result)
+                }
+            }
+            isAnimatingSequence = false
+        }
+    }
+
+    private func startRandomAnimation() {
+        guard !isAnimatingSequence else { return }
+        guard let result else { return }
+        isAnimatingSequence = true
+        Task { @MainActor in
+            let rows = result.count
+            let cols = result.first?.count ?? 0
+            var ids: [ResultCellIdentifier] = []
+            ids.reserveCapacity(rows * cols)
+            for row in 0..<rows {
+                for col in 0..<cols {
+                    ids.append(ResultCellIdentifier(row: row, col: col))
+                }
+            }
+            ids.shuffle()
+            for id in ids {
+                await animateResultCell(row: id.row, col: id.col, result: result)
+            }
+            isAnimatingSequence = false
+        }
+    }
+
+    private func animateResultCell(row: Int, col: Int, result: [[Int]]) async {
+        selectedResultRow = row
+        selectedResultCol = col
+        await waitForAnimationData(row: row, col: col)
+        animationSelectedRow = row
+        animationSelectedCol = col
+        animationResultValue = result[row][col]
+        animationResultCellFrame = resultCellPositions.first {
+            $0.id.row == row && $0.id.col == col
+        }?.frame
+        animationRunId = UUID()
+        showingAnimation = true
+
+        let count = matrixA.cols
+        let duration = MultiplicationAnimationOverlay.totalDuration(count: count, speed: animationSpeed)
+        let buffer: Double = 0.15
+        let nanos = UInt64((duration + buffer) * 1_000_000_000)
+        try? await Task.sleep(nanoseconds: nanos)
+    }
+
+    private func waitForAnimationData(row: Int, col: Int) async {
+        let maxAttempts = 20
+        let delayNanos: UInt64 = 30_000_000
+        for _ in 0..<maxAttempts {
+            if hasAnimationData(row: row, col: col) {
+                return
+            }
+            try? await Task.sleep(nanoseconds: delayNanos)
+        }
+    }
+
+    private func hasAnimationData(row: Int, col: Int) -> Bool {
+        let rowCount = cellPositions.filter { $0.id.matrix == 0 && $0.id.row == row }.count
+        let colCount = cellPositions.filter { $0.id.matrix == 1 && $0.id.col == col }.count
+        let resultFrameAvailable = resultCellPositions.contains { $0.id.row == row && $0.id.col == col }
+        return rowCount == matrixA.cols && colCount == matrixB.rows && resultFrameAvailable
     }
 }
 

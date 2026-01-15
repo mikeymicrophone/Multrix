@@ -60,6 +60,112 @@ struct AnimationTiming {
     var sumDelay: Double = 0.2
     var flyToResultDuration: Double = 0.35
     var flyToResultDelay: Double = 0.2
+
+    func scaled(for speed: AnimationSpeed) -> AnimationTiming {
+        var timing = self
+        timing.flyOutDuration *= speed.flyOutFactor
+        timing.flyOutDelay *= speed.flyOutDelayFactor
+        timing.alignDuration *= speed.alignFactor
+        timing.alignDelay *= speed.alignDelayFactor
+        timing.pairDuration *= speed.pairFactor
+        timing.pairDelay *= speed.pairDelayFactor
+        timing.productRevealDuration *= speed.productFactor
+        timing.productRevealDelay *= speed.productDelayFactor
+        timing.collapseDuration *= speed.collapseFactor
+        timing.collapseDelay *= speed.collapseDelayFactor
+        timing.collapseStepDelay *= speed.collapseStepDelayFactor
+        timing.sumDuration *= speed.sumFactor
+        timing.sumDelay *= speed.sumDelayFactor
+        timing.flyToResultDuration *= speed.flyToResultFactor
+        timing.flyToResultDelay *= speed.flyToResultDelayFactor
+        return timing
+    }
+}
+
+enum AnimationSpeed: Int, CaseIterable, Equatable {
+    case slow
+    case normal
+    case fast
+    case fastest
+
+    var flyOutFactor: Double { phaseFactor }
+    var flyOutDelayFactor: Double { delayFactor }
+    var alignFactor: Double { phaseFactor }
+    var alignDelayFactor: Double { delayFactor }
+    var pairFactor: Double { phaseFactor }
+    var pairDelayFactor: Double { delayFactor }
+    var productFactor: Double { productPhaseFactor }
+    var productDelayFactor: Double { productDelayPhaseFactor }
+    var collapseFactor: Double { phaseFactor }
+    var collapseDelayFactor: Double { delayFactor }
+    var collapseStepDelayFactor: Double { collapseDelayPhaseFactor }
+    var sumFactor: Double { sumPhaseFactor }
+    var sumDelayFactor: Double { delayFactor }
+    var flyToResultFactor: Double { flyPhaseFactor }
+    var flyToResultDelayFactor: Double { delayFactor }
+
+    private var phaseFactor: Double {
+        switch self {
+        case .slow: return 1.4
+        case .normal: return 1.0
+        case .fast: return 0.8
+        case .fastest: return 0.6
+        }
+    }
+
+    private var delayFactor: Double {
+        switch self {
+        case .slow: return 1.3
+        case .normal: return 1.0
+        case .fast: return 0.7
+        case .fastest: return 0.5
+        }
+    }
+
+    private var productPhaseFactor: Double {
+        switch self {
+        case .slow: return 1.5
+        case .normal: return 1.0
+        case .fast: return 0.7
+        case .fastest: return 0.5
+        }
+    }
+
+    private var productDelayPhaseFactor: Double {
+        switch self {
+        case .slow: return 1.4
+        case .normal: return 1.0
+        case .fast: return 0.6
+        case .fastest: return 0.45
+        }
+    }
+
+    private var collapseDelayPhaseFactor: Double {
+        switch self {
+        case .slow: return 1.4
+        case .normal: return 1.0
+        case .fast: return 0.7
+        case .fastest: return 0.5
+        }
+    }
+
+    private var sumPhaseFactor: Double {
+        switch self {
+        case .slow: return 1.3
+        case .normal: return 1.0
+        case .fast: return 0.75
+        case .fastest: return 0.6
+        }
+    }
+
+    private var flyPhaseFactor: Double {
+        switch self {
+        case .slow: return 1.2
+        case .normal: return 1.0
+        case .fast: return 0.8
+        case .fastest: return 0.65
+        }
+    }
 }
 
 // MARK: - Animated Cell Data
@@ -80,6 +186,7 @@ struct MultiplicationAnimationOverlay: View {
     let selectedCol: Int
     let finalSum: Int
     let resultCellFrame: CGRect?
+    let speed: AnimationSpeed
     let onResultPlaced: ((CGRect, Int) -> Void)?
     let onAnimationFinished: (() -> Void)?
 
@@ -448,25 +555,26 @@ struct MultiplicationAnimationOverlay: View {
 
     private func startAnimation() {
         guard count > 0 else { return }
-        var totalDelay: Double = timing.flyOutDelay
+        let adjustedTiming = timing.scaled(for: speed)
+        var totalDelay: Double = adjustedTiming.flyOutDelay
 
         // Phase 1: Fly out
-        withAnimation(.easeInOut(duration: timing.flyOutDuration).delay(totalDelay)) {
+        withAnimation(.easeInOut(duration: adjustedTiming.flyOutDuration).delay(totalDelay)) {
             phase = .flyOut
         }
-        totalDelay += timing.flyOutDuration + timing.alignDelay
+        totalDelay += adjustedTiming.flyOutDuration + adjustedTiming.alignDelay
 
         // Phase 2: Align (skipped since flyOut goes directly to aligned position)
-        withAnimation(.easeInOut(duration: timing.alignDuration).delay(totalDelay)) {
+        withAnimation(.easeInOut(duration: adjustedTiming.alignDuration).delay(totalDelay)) {
             phase = .align
         }
-        totalDelay += timing.alignDuration + timing.pairDelay
+        totalDelay += adjustedTiming.alignDuration + adjustedTiming.pairDelay
 
         // Phase 3: Pair
-        withAnimation(.easeInOut(duration: timing.pairDuration).delay(totalDelay)) {
+        withAnimation(.easeInOut(duration: adjustedTiming.pairDuration).delay(totalDelay)) {
             phase = .pair
         }
-        totalDelay += timing.pairDuration + timing.productRevealDelay
+        totalDelay += adjustedTiming.pairDuration + adjustedTiming.productRevealDelay
 
         // Phase 4: Multiply - reveal products sequentially
         withAnimation(.easeInOut(duration: 0.1).delay(totalDelay)) {
@@ -475,12 +583,12 @@ struct MultiplicationAnimationOverlay: View {
 
         // Reveal each product one at a time
         for i in 0..<count {
-            let productDelay = totalDelay + Double(i) * timing.productRevealDelay
-            withAnimation(.easeInOut(duration: timing.productRevealDuration).delay(productDelay)) {
+            let productDelay = totalDelay + Double(i) * adjustedTiming.productRevealDelay
+            withAnimation(.easeInOut(duration: adjustedTiming.productRevealDuration).delay(productDelay)) {
                 visibleProductCount = i + 1
             }
         }
-        totalDelay += Double(count) * timing.productRevealDelay + timing.collapseDelay
+        totalDelay += Double(count) * adjustedTiming.productRevealDelay + adjustedTiming.collapseDelay
 
         // Phase 5: Collapse - sequential sum animation
         withAnimation(.easeInOut(duration: 0.1).delay(totalDelay)) {
@@ -490,29 +598,29 @@ struct MultiplicationAnimationOverlay: View {
         // Each product (starting from index 1) moves up and merges into running sum
         if count > 1 {
             for i in 1..<count {
-                let collapseStepDelay = totalDelay + Double(i - 1) * timing.collapseStepDelay
-                withAnimation(.easeInOut(duration: timing.collapseDuration).delay(collapseStepDelay)) {
+                let collapseStepDelay = totalDelay + Double(i - 1) * adjustedTiming.collapseStepDelay
+                withAnimation(.easeInOut(duration: adjustedTiming.collapseDuration).delay(collapseStepDelay)) {
                     collapsedCount = i
                 }
             }
         }
-        totalDelay += Double(max(0, count - 1)) * timing.collapseStepDelay + timing.sumDelay
+        totalDelay += Double(max(0, count - 1)) * adjustedTiming.collapseStepDelay + adjustedTiming.sumDelay
 
         // Phase 6: Sum
-        withAnimation(.easeInOut(duration: timing.sumDuration).delay(totalDelay)) {
+        withAnimation(.easeInOut(duration: adjustedTiming.sumDuration).delay(totalDelay)) {
             phase = .sum
         }
-        totalDelay += timing.sumDuration + 0.3
+        totalDelay += adjustedTiming.sumDuration + 0.3
 
         // Phase 7: Complete
         withAnimation(.easeInOut(duration: 0.2).delay(totalDelay)) {
             phase = .complete
         }
-        totalDelay += 0.2 + timing.flyToResultDelay
+        totalDelay += 0.2 + adjustedTiming.flyToResultDelay
 
         // Phase 8: Fly to result cell
         let flyToResultStart = totalDelay
-        withAnimation(.easeInOut(duration: timing.flyToResultDuration).delay(totalDelay)) {
+        withAnimation(.easeInOut(duration: adjustedTiming.flyToResultDuration).delay(totalDelay)) {
             phase = .flyToResult
         }
         if let frame = resultCellFrame {
@@ -520,12 +628,28 @@ struct MultiplicationAnimationOverlay: View {
                 onResultPlaced?(frame, finalSum)
             }
         }
-        let finishDelay = flyToResultStart + timing.flyToResultDuration
+        let finishDelay = flyToResultStart + adjustedTiming.flyToResultDuration
         if let onAnimationFinished {
             DispatchQueue.main.asyncAfter(deadline: .now() + finishDelay) {
                 onAnimationFinished()
             }
         }
+    }
+
+    static func totalDuration(count: Int, speed: AnimationSpeed) -> Double {
+        guard count > 0 else { return 0 }
+        let base = AnimationTiming()
+        let timing = base.scaled(for: speed)
+        var totalDelay: Double = timing.flyOutDelay
+        totalDelay += timing.flyOutDuration + timing.alignDelay
+        totalDelay += timing.alignDuration + timing.pairDelay
+        totalDelay += timing.pairDuration + timing.productRevealDelay
+        totalDelay += Double(count) * timing.productRevealDelay + timing.collapseDelay
+        totalDelay += Double(max(0, count - 1)) * timing.collapseStepDelay + timing.sumDelay
+        totalDelay += timing.sumDuration + 0.3
+        totalDelay += 0.2 + timing.flyToResultDelay
+        totalDelay += timing.flyToResultDuration
+        return totalDelay
     }
 
 }
@@ -547,6 +671,7 @@ struct MultiplicationAnimationOverlay: View {
             selectedCol: 0,
             finalSum: 23,
             resultCellFrame: CGRect(x: 100, y: 400, width: 50, height: 50),
+            speed: .normal,
             onResultPlaced: nil,
             onAnimationFinished: nil
         )

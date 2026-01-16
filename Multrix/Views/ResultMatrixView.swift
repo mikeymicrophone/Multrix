@@ -22,21 +22,26 @@ struct ResultMatrixView: View {
                 HStack(spacing: 4) {
                     ForEach(0..<cols, id: \.self) { col in
                         let isSelected = row == selectedRow && col == selectedCol
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(isSelected ? Color.orange.opacity(0.3) : Color.green.opacity(0.1))
-                                .stroke(isSelected ? Color.orange : Color.green.opacity(0.3), lineWidth: isSelected ? 2 : 1)
-
-                            Text("\(values[row][col])")
-                                .font(.system(size: 14))
-                                .fontWeight(.medium)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.5)
-                        }
-                        .frame(width: 50, height: 50)
-                        .onTapGesture {
+                        Button {
                             onCellTap(row, col)
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(isSelected ? Color.orange.opacity(0.3) : Color.green.opacity(0.1))
+                                    .stroke(isSelected ? Color.orange : Color.green.opacity(0.3), lineWidth: isSelected ? 2 : 1)
+
+                                Text("\(values[row][col])")
+                                    .font(.system(size: 14))
+                                    .fontWeight(.medium)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
+                            }
+                            .frame(width: 50, height: 50)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("result.cell.\(row).\(col)")
+                        .accessibilityLabel("Result cell \(row + 1) \(col + 1)")
+                        .accessibilityValue("\(values[row][col])")
                         .background(
                             GeometryReader { geo in
                                 Color.clear.preference(
@@ -59,6 +64,7 @@ struct ResultMatrixView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.green.opacity(0.5), lineWidth: 2)
         )
+        .accessibilityElement(children: .contain)
     }
 }
 

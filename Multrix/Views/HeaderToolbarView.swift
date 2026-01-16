@@ -34,6 +34,7 @@ struct HeaderToolbarView: View {
                 .background(Color.orange)
                 .clipShape(Circle())
         }
+        .accessibilityIdentifier("toolbar.pause")
     }
 
     private var settingsButton: some View {
@@ -44,6 +45,7 @@ struct HeaderToolbarView: View {
                 .padding(8)
         }
         .accessibilityLabel("Preferences")
+        .accessibilityIdentifier("toolbar.preferences")
     }
 }
 

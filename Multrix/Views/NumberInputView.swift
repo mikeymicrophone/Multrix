@@ -51,6 +51,7 @@ struct NumberInputView: View {
                             .foregroundColor(.white)
                             .cornerRadius(10)
                     }
+                    .accessibilityIdentifier("numberInput.digit.\(digit)")
                 }
             }
 
@@ -66,6 +67,7 @@ struct NumberInputView: View {
                         .foregroundColor(.white)
                         .cornerRadius(10)
                 }
+                .accessibilityIdentifier("numberInput.tens")
                 .disabled(tensMode)
 
                 Button(action: { digitTapped(0) }) {
@@ -76,6 +78,7 @@ struct NumberInputView: View {
                         .foregroundColor(.white)
                         .cornerRadius(10)
                 }
+                .accessibilityIdentifier("numberInput.digit.0")
 
                 // Placeholder for symmetry
                 Color.clear
@@ -85,8 +88,10 @@ struct NumberInputView: View {
             Button("Cancel") {
                 isPresented = false
             }
+            .accessibilityIdentifier("numberInput.cancel")
             .padding(.top, 8)
         }
+        .accessibilityIdentifier("numberInput.container")
         .padding(20)
         .frame(width: 260)
         .background(Color(.systemBackground))

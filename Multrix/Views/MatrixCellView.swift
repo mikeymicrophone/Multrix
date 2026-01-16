@@ -48,6 +48,29 @@ struct MatrixCellView: View {
         (isHighlighted || isEmpty) ? 2 : 1
     }
 
+    private var accessibilityIdentifier: String {
+        let matrix = cellId?.matrix ?? -1
+        let row = cellId?.row ?? -1
+        let col = cellId?.col ?? -1
+        return "matrix.\(matrix).cell.\(row).\(col)"
+    }
+
+    private var accessibilityValueDescription: String {
+        if let value { return "value \(value)" }
+        return "empty"
+    }
+
+    private var accessibilityLabel: String {
+        guard let cellId else { return "Matrix cell" }
+        let matrixName = cellId.matrix == 0 ? "Matrix A" : "Matrix B"
+        return "\(matrixName) cell \(cellId.row + 1) \(cellId.col + 1), \(accessibilityValueDescription)"
+    }
+
+    private var accessibilityValue: String {
+        if let value { return "\(value)" }
+        return "empty"
+    }
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 6)
@@ -74,6 +97,11 @@ struct MatrixCellView: View {
         .onTapGesture {
             onTap()
         }
+        .accessibilityElement()
+        .accessibilityIdentifier(accessibilityIdentifier)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(accessibilityValue)
+        .accessibilityAddTraits(.isButton)
         .background(
             GeometryReader { geo in
                 Color.clear

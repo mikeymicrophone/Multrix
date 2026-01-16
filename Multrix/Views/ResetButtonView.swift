@@ -17,6 +17,7 @@ struct ResetButtonView: View {
             .font(.subheadline)
             .foregroundColor(.blue)
         }
+        .accessibilityIdentifier("reset.matrices")
         .padding(.bottom)
     }
 }

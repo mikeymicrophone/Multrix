@@ -20,6 +20,7 @@ struct CalculateButtonView: View {
                     .background(canCalculate ? Color.blue : Color.gray)
                     .cornerRadius(12)
             }
+            .accessibilityIdentifier("calculate.multiply")
             .disabled(!canCalculate)
 
             if showIncompleteMessage {

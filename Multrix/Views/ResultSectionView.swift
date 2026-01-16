@@ -76,9 +76,11 @@ struct ResultSectionView: View {
         VStack(spacing: 8) {
             Text("Result [\(matrixA.rows)×\(matrixB.cols)]")
                 .font(.headline)
+                .accessibilityIdentifier("result.title")
             Text("Tap a cell to see how it was calculated")
                 .font(.caption)
                 .foregroundColor(.secondary)
+                .accessibilityIdentifier("result.hint")
             ResultMatrixView(
                 values: result,
                 selectedRow: selectedRow,
@@ -91,6 +93,8 @@ struct ResultSectionView: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("result.matrix")
     }
 }
 

@@ -123,6 +123,7 @@ struct CalculationBreakdownView: View {
                 .fill(Color.orange.opacity(0.1))
                 .stroke(Color.orange.opacity(0.3), lineWidth: 1)
         )
+        .accessibilityIdentifier("result.breakdown")
     }
 }
 

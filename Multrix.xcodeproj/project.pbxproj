@@ -6,8 +6,27 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		53D161DA2F17190A00EA7820 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 53D161BA2F17190800EA7820 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 53D161C12F17190800EA7820;
+			remoteInfo = Multrix;
+		};
+		53D161DB2F17190A00EA7820 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 53D161BA2F17190800EA7820 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 53D161C12F17190800EA7820;
+			remoteInfo = Multrix;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		53D161C22F17190800EA7820 /* Multrix.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Multrix.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		53D161D02F17190A00EA7820 /* MultrixTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MultrixTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		53D161DC2F17190A00EA7820 /* MultrixUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MultrixUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +35,34 @@
 			path = Multrix;
 			sourceTree = "<group>";
 		};
+		53D161D52F17190A00EA7820 /* MultrixTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MultrixTests;
+			sourceTree = "<group>";
+		};
+		53D161DD2F17190A00EA7820 /* MultrixUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MultrixUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		53D161BF2F17190800EA7820 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		53D161D32F17190A00EA7820 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		53D161DE2F17190A00EA7820 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +76,8 @@
 			isa = PBXGroup;
 			children = (
 				53D161C42F17190800EA7820 /* Multrix */,
+				53D161D52F17190A00EA7820 /* MultrixTests */,
+				53D161DD2F17190A00EA7820 /* MultrixUITests */,
 				53D161C32F17190800EA7820 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +86,8 @@
 			isa = PBXGroup;
 			children = (
 				53D161C22F17190800EA7820 /* Multrix.app */,
+				53D161D02F17190A00EA7820 /* MultrixTests.xctest */,
+				53D161DC2F17190A00EA7820 /* MultrixUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +117,52 @@
 			productReference = 53D161C22F17190800EA7820 /* Multrix.app */;
 			productType = "com.apple.product-type.application";
 		};
+		53D161D12F17190A00EA7820 /* MultrixTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 53D161D62F17190A00EA7820 /* Build configuration list for PBXNativeTarget "MultrixTests" */;
+			buildPhases = (
+				53D161D22F17190A00EA7820 /* Sources */,
+				53D161D32F17190A00EA7820 /* Frameworks */,
+				53D161D42F17190A00EA7820 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				53D161D92F17190A00EA7820 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				53D161D52F17190A00EA7820 /* MultrixTests */,
+			);
+			name = MultrixTests;
+			packageProductDependencies = (
+			);
+			productName = MultrixTests;
+			productReference = 53D161D02F17190A00EA7820 /* MultrixTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		53D161DF2F17190A00EA7820 /* MultrixUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 53D161E62F17190A00EA7820 /* Build configuration list for PBXNativeTarget "MultrixUITests" */;
+			buildPhases = (
+				53D161E12F17190A00EA7820 /* Sources */,
+				53D161DE2F17190A00EA7820 /* Frameworks */,
+				53D161E02F17190A00EA7820 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				53D161E22F17190A00EA7820 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				53D161DD2F17190A00EA7820 /* MultrixUITests */,
+			);
+			name = MultrixUITests;
+			packageProductDependencies = (
+			);
+			productName = MultrixUITests;
+			productReference = 53D161DC2F17190A00EA7820 /* MultrixUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -82,6 +175,14 @@
 				TargetAttributes = {
 					53D161C12F17190800EA7820 = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					53D161D12F17190A00EA7820 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 53D161C12F17190800EA7820;
+					};
+					53D161DF2F17190A00EA7820 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 53D161C12F17190800EA7820;
 					};
 				};
 			};
@@ -100,12 +201,28 @@
 			projectRoot = "";
 			targets = (
 				53D161C12F17190800EA7820 /* Multrix */,
+				53D161D12F17190A00EA7820 /* MultrixTests */,
+				53D161DF2F17190A00EA7820 /* MultrixUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		53D161C02F17190800EA7820 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		53D161D42F17190A00EA7820 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		53D161E02F17190A00EA7820 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +239,34 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		53D161D22F17190A00EA7820 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		53D161E12F17190A00EA7820 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		53D161D92F17190A00EA7820 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 53D161C12F17190800EA7820 /* Multrix */;
+			targetProxy = 53D161DA2F17190A00EA7820 /* PBXContainerItemProxy */;
+		};
+		53D161E22F17190A00EA7820 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 53D161C12F17190800EA7820 /* Multrix */;
+			targetProxy = 53D161DB2F17190A00EA7820 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		53D161CB2F17190A00EA7820 /* Debug */ = {
@@ -273,7 +417,7 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -305,8 +449,106 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		53D161D72F17190A00EA7820 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C7FJS9SLNW;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.MICharisma.MultrixTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Multrix.app/Multrix";
+			};
+			name = Debug;
+		};
+		53D161D82F17190A00EA7820 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C7FJS9SLNW;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.MICharisma.MultrixTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Multrix.app/Multrix";
+			};
+			name = Release;
+		};
+		53D161E42F17190A00EA7820 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C7FJS9SLNW;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.MICharisma.MultrixUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Multrix;
+			};
+			name = Debug;
+		};
+		53D161E52F17190A00EA7820 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C7FJS9SLNW;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.MICharisma.MultrixUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Multrix;
 			};
 			name = Release;
 		};
@@ -327,6 +569,24 @@
 			buildConfigurations = (
 				53D161CE2F17190A00EA7820 /* Debug */,
 				53D161CF2F17190A00EA7820 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		53D161D62F17190A00EA7820 /* Build configuration list for PBXNativeTarget "MultrixTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				53D161D72F17190A00EA7820 /* Debug */,
+				53D161D82F17190A00EA7820 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		53D161E62F17190A00EA7820 /* Build configuration list for PBXNativeTarget "MultrixUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				53D161E42F17190A00EA7820 /* Debug */,
+				53D161E52F17190A00EA7820 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

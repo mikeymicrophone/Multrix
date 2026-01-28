@@ -916,13 +916,13 @@ struct MultiplicationAnimationOverlay: View {
         await pauseAwareSleep(seconds: completeDuration + adjustedTiming.flyToResultDelay)
 
         // Phase 8: Fly to result cell
-        if let frame = resultCellFrame {
-            onResultPlaced?(frame, finalSum)
-        }
         withAnimation(.easeInOut(duration: adjustedTiming.flyToResultDuration)) {
             phase = .flyToResult
         }
         await pauseAwareSleep(seconds: adjustedTiming.flyToResultDuration)
+        if let frame = resultCellFrame {
+            onResultPlaced?(frame, finalSum)
+        }
         onAnimationFinished?()
     }
 

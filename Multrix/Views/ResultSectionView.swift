@@ -14,11 +14,16 @@ struct ResultSectionView: View {
     let selectedRow: Int?
     let selectedCol: Int?
     let isAnimatingSequence: Bool
+    let isChangeGameActive: Bool
+    let changedResultCells: Set<ResultCellIdentifier>
+    let changeGameMessage: String?
+    let isChangeGameButtonDisabled: Bool
     let contentWidth: CGFloat
     let onCellSelected: (_ row: Int?, _ col: Int?) -> Void
     let onAnimateTapped: () -> Void
     let onAnimateAllTapped: () -> Void
     let onAnimateRandomTapped: () -> Void
+    let onChangeGameTapped: () -> Void
 
     var body: some View {
         if horizontalSizeClass == .regular {
@@ -68,7 +73,7 @@ struct ResultSectionView: View {
             onAnimateTapped: onAnimateTapped,
             onAnimateAllTapped: onAnimateAllTapped,
             onAnimateRandomTapped: onAnimateRandomTapped,
-            isAnimatingSequence: isAnimatingSequence
+            isAnimatingSequence: isAnimatingSequence || isChangeGameActive
         )
     }
 
@@ -84,13 +89,31 @@ struct ResultSectionView: View {
             ResultMatrixView(
                 values: result,
                 selectedRow: selectedRow,
-                selectedCol: selectedCol
+                selectedCol: selectedCol,
+                changedCells: changedResultCells
             ) { row, col in
                 if selectedRow == row && selectedCol == col {
                     onCellSelected(nil, nil)
                 } else {
                     onCellSelected(row, col)
                 }
+            }
+
+            Button(action: onChangeGameTapped) {
+                Text(isChangeGameActive ? "New Mystery Change" : "Start Find-the-Change")
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(isChangeGameButtonDisabled ? Color.gray : Color.indigo)
+                    .cornerRadius(8)
+            }
+            .disabled(isChangeGameButtonDisabled)
+
+            if let changeGameMessage {
+                Text(changeGameMessage)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .accessibilityElement(children: .contain)
@@ -112,11 +135,16 @@ private let previewResult = [[10, 20], [30, 40]]
         selectedRow: 0,
         selectedCol: 0,
         isAnimatingSequence: false,
+        isChangeGameActive: false,
+        changedResultCells: [],
+        changeGameMessage: nil,
+        isChangeGameButtonDisabled: false,
         contentWidth: 500,
         onCellSelected: { _, _ in },
         onAnimateTapped: {},
         onAnimateAllTapped: {},
-        onAnimateRandomTapped: {}
+        onAnimateRandomTapped: {},
+        onChangeGameTapped: {}
     )
     .environment(\.horizontalSizeClass, .regular)
     .padding()
@@ -130,11 +158,16 @@ private let previewResult = [[10, 20], [30, 40]]
         selectedRow: nil,
         selectedCol: nil,
         isAnimatingSequence: false,
+        isChangeGameActive: false,
+        changedResultCells: [],
+        changeGameMessage: nil,
+        isChangeGameButtonDisabled: false,
         contentWidth: 500,
         onCellSelected: { _, _ in },
         onAnimateTapped: {},
         onAnimateAllTapped: {},
-        onAnimateRandomTapped: {}
+        onAnimateRandomTapped: {},
+        onChangeGameTapped: {}
     )
     .environment(\.horizontalSizeClass, .regular)
     .padding()
@@ -148,11 +181,16 @@ private let previewResult = [[10, 20], [30, 40]]
         selectedRow: 1,
         selectedCol: 1,
         isAnimatingSequence: false,
+        isChangeGameActive: true,
+        changedResultCells: [ResultCellIdentifier(row: 0, col: 0), ResultCellIdentifier(row: 1, col: 1)],
+        changeGameMessage: "Find the value that changed.",
+        isChangeGameButtonDisabled: false,
         contentWidth: 350,
         onCellSelected: { _, _ in },
         onAnimateTapped: {},
         onAnimateAllTapped: {},
-        onAnimateRandomTapped: {}
+        onAnimateRandomTapped: {},
+        onChangeGameTapped: {}
     )
     .environment(\.horizontalSizeClass, .compact)
     .padding()
@@ -166,11 +204,16 @@ private let previewResult = [[10, 20], [30, 40]]
         selectedRow: 0,
         selectedCol: 1,
         isAnimatingSequence: true,
+        isChangeGameActive: false,
+        changedResultCells: [],
+        changeGameMessage: nil,
+        isChangeGameButtonDisabled: true,
         contentWidth: 500,
         onCellSelected: { _, _ in },
         onAnimateTapped: {},
         onAnimateAllTapped: {},
-        onAnimateRandomTapped: {}
+        onAnimateRandomTapped: {},
+        onChangeGameTapped: {}
     )
     .environment(\.horizontalSizeClass, .regular)
     .padding()

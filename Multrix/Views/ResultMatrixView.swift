@@ -11,6 +11,7 @@ struct ResultMatrixView: View {
     let values: [[Int]]
     let selectedRow: Int?
     let selectedCol: Int?
+    let changedCells: Set<ResultCellIdentifier>
     let onCellTap: (Int, Int) -> Void
 
     private var rows: Int { values.count }
@@ -22,19 +23,21 @@ struct ResultMatrixView: View {
                 HStack(spacing: 4) {
                     ForEach(0..<cols, id: \.self) { col in
                         let isSelected = row == selectedRow && col == selectedCol
+                        let isChanged = changedCells.contains(ResultCellIdentifier(row: row, col: col))
                         Button {
                             onCellTap(row, col)
                         } label: {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 6)
-                                    .fill(isSelected ? Color.orange.opacity(0.3) : Color.green.opacity(0.1))
-                                    .stroke(isSelected ? Color.orange : Color.green.opacity(0.3), lineWidth: isSelected ? 2 : 1)
+                                    .fill(fillColor(isSelected: isSelected, isChanged: isChanged))
+                                    .stroke(strokeColor(isSelected: isSelected, isChanged: isChanged), lineWidth: isSelected ? 2 : 1)
 
                                 Text("\(values[row][col])")
                                     .font(.system(size: 14))
                                     .fontWeight(.medium)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.5)
+                                    .foregroundColor(isSelected ? .orange : (isChanged ? .red : .primary))
                             }
                             .frame(width: 50, height: 50)
                         }
@@ -66,6 +69,26 @@ struct ResultMatrixView: View {
         )
         .accessibilityElement(children: .contain)
     }
+
+    private func fillColor(isSelected: Bool, isChanged: Bool) -> Color {
+        if isSelected {
+            return Color.orange.opacity(0.3)
+        }
+        if isChanged {
+            return Color.red.opacity(0.2)
+        }
+        return Color.green.opacity(0.1)
+    }
+
+    private func strokeColor(isSelected: Bool, isChanged: Bool) -> Color {
+        if isSelected {
+            return Color.orange
+        }
+        if isChanged {
+            return Color.red.opacity(0.7)
+        }
+        return Color.green.opacity(0.3)
+    }
 }
 
 #Preview {
@@ -76,6 +99,7 @@ struct ResultMatrixView: View {
         ],
         selectedRow: 1,
         selectedCol: 2,
+        changedCells: [ResultCellIdentifier(row: 0, col: 1)],
         onCellTap: { _, _ in }
     )
 }

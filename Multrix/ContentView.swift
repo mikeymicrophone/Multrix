@@ -48,12 +48,13 @@ struct ContentView: View {
     // MARK: - Change Game State
 
     @State private var changeGameActive = false
-    @State private var changeGameResult: [[Int]]? = nil
+    @State private var changeGameBaseResult: [[Int]]? = nil
     @State private var changeGameChangedCells: Set<ResultCellIdentifier> = []
     @State private var changeGameTarget: CellIdentifier? = nil
     @State private var changeGameOriginalValue: Int? = nil
     @State private var changeGameNewValue: Int? = nil
     @State private var changeGameMessage: String? = nil
+    @State private var showOriginalResult = false
 
     // MARK: - Preferences State
 
@@ -83,16 +84,19 @@ struct ContentView: View {
         }
     }
 
-    private var displayResult: [[Int]]? {
-        changeGameActive ? (changeGameResult ?? result) : result
-    }
-
     private var effectiveSelectedRow: Int? {
-        changeGameActive ? nil : selectedResultRow
+        selectedResultRow
     }
 
     private var effectiveSelectedCol: Int? {
-        changeGameActive ? nil : selectedResultCol
+        selectedResultCol
+    }
+
+    private var displayResult: [[Int]]? {
+        if changeGameActive, showOriginalResult, let baseResult = changeGameBaseResult {
+            return baseResult
+        }
+        return result
     }
 
     // MARK: - Init
@@ -179,9 +183,13 @@ struct ContentView: View {
                         changedResultCells: changeGameActive ? changeGameChangedCells : [],
                         changeGameMessage: changeGameMessage,
                         isChangeGameButtonDisabled: isAnimating,
+                        showOriginalResult: $showOriginalResult,
                         contentWidth: contentWidth,
                         onCellSelected: { row, col in
-                            guard !changeGameActive else { return }
+                            if changeGameActive, let row, let col {
+                                let id = ResultCellIdentifier(row: row, col: col)
+                                if changeGameChangedCells.contains(id) { return }
+                            }
                             handleResultCellSelected(row: row, col: col)
                         },
                         onAnimateTapped: animateSelectedCell,
@@ -261,10 +269,14 @@ struct ContentView: View {
                 } else {
                     matrixB.values[editingRow][editingCol] = number
                 }
-                result = nil
-                selectedResultRow = nil
-                selectedResultCol = nil
-                clearChangeGameState()
+                if changeGameActive {
+                    updateResultForChangeGame()
+                } else {
+                    result = nil
+                    selectedResultRow = nil
+                    selectedResultCol = nil
+                    clearChangeGameState()
+                }
             }
         }
     }
@@ -274,10 +286,6 @@ struct ContentView: View {
 
 extension ContentView {
     private func handleCellTapped(matrix: Int, row: Int, col: Int) {
-        if changeGameActive {
-            handleChangeGameGuess(matrix: matrix, row: row, col: col)
-            return
-        }
         editingMatrix = matrix
         editingRow = row
         editingCol = col
@@ -516,12 +524,13 @@ extension ContentView {
         guard let baseResult = result else { return }
         guard !isAnimating else { return }
 
-        changeGameMessage = "Find the input value that changed."
+        changeGameMessage = "Fix the input value that changed."
         changeGameChangedCells = []
-        changeGameResult = nil
+        changeGameBaseResult = baseResult
         changeGameTarget = nil
         changeGameOriginalValue = nil
         changeGameNewValue = nil
+        showOriginalResult = false
         resultStamps = [:]
         showingAnimation = false
         isAnimatingSequence = false
@@ -574,11 +583,23 @@ extension ContentView {
             if changedCells.isEmpty { continue }
 
             changeGameActive = true
-            changeGameResult = modifiedResult
+            if targetMatrix == 0 {
+                matrixA.values[targetRow][targetCol] = newValue
+            } else {
+                matrixB.values[targetRow][targetCol] = newValue
+            }
+            result = modifiedResult
             changeGameChangedCells = changedCells
             changeGameTarget = CellIdentifier(matrix: targetMatrix, row: targetRow, col: targetCol)
             changeGameOriginalValue = originalValue
             changeGameNewValue = newValue
+            if let selectedResultRow, let selectedResultCol {
+                let selectedId = ResultCellIdentifier(row: selectedResultRow, col: selectedResultCol)
+                if changedCells.contains(selectedId) {
+                    self.selectedResultRow = nil
+                    self.selectedResultCol = nil
+                }
+            }
             return
         }
 
@@ -598,28 +619,53 @@ extension ContentView {
         return changed
     }
 
-    private func handleChangeGameGuess(matrix: Int, row: Int, col: Int) {
-        guard changeGameActive, let target = changeGameTarget else { return }
-        if target.matrix == matrix && target.row == row && target.col == col {
-            let matrixName = matrix == 0 ? "Matrix A" : "Matrix B"
-            if let originalValue = changeGameOriginalValue, let newValue = changeGameNewValue {
-                changeGameMessage = "Correct! \(matrixName) cell \(row + 1),\(col + 1) changed from \(originalValue) to \(newValue)."
-            } else {
-                changeGameMessage = "Correct! \(matrixName) cell \(row + 1),\(col + 1) was the change."
-            }
-            clearChangeGameState(preserveMessage: true)
+    private func updateResultForChangeGame() {
+        guard changeGameActive else { return }
+        let updatedResult = computeResultMatrix(
+            rows: matrixA.rows,
+            cols: matrixB.cols,
+            sharedDim: matrixA.cols,
+            matrixA: matrixA,
+            matrixB: matrixB
+        )
+        result = updatedResult
+
+        if let baseResult = changeGameBaseResult {
+            changeGameChangedCells = changedResultCells(base: baseResult, modified: updatedResult)
         } else {
-            changeGameMessage = "Not that one. Try again."
+            changeGameChangedCells = []
+        }
+
+        if let selectedResultRow, let selectedResultCol {
+            let selectedId = ResultCellIdentifier(row: selectedResultRow, col: selectedResultCol)
+            if changeGameChangedCells.contains(selectedId) {
+                self.selectedResultRow = nil
+                self.selectedResultCol = nil
+            }
+        }
+
+        guard changeGameChangedCells.isEmpty,
+              let target = changeGameTarget,
+              let originalValue = changeGameOriginalValue else { return }
+
+        let currentValue = target.matrix == 0
+            ? matrixA.values[target.row][target.col]
+            : matrixB.values[target.row][target.col]
+        if currentValue == originalValue {
+            let matrixName = target.matrix == 0 ? "Matrix A" : "Matrix B"
+            changeGameMessage = "Nice! \(matrixName) cell \(target.row + 1),\(target.col + 1) is fixed."
+            clearChangeGameState(preserveMessage: true)
         }
     }
 
     private func clearChangeGameState(preserveMessage: Bool = false) {
         changeGameActive = false
-        changeGameResult = nil
+        changeGameBaseResult = nil
         changeGameChangedCells = []
         changeGameTarget = nil
         changeGameOriginalValue = nil
         changeGameNewValue = nil
+        showOriginalResult = false
         if !preserveMessage {
             changeGameMessage = nil
         }

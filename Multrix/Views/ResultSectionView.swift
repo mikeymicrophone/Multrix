@@ -18,6 +18,7 @@ struct ResultSectionView: View {
     let changedResultCells: Set<ResultCellIdentifier>
     let changeGameMessage: String?
     let isChangeGameButtonDisabled: Bool
+    @Binding var showOriginalResult: Bool
     let contentWidth: CGFloat
     let onCellSelected: (_ row: Int?, _ col: Int?) -> Void
     let onAnimateTapped: () -> Void
@@ -38,7 +39,7 @@ struct ResultSectionView: View {
     private var iPadLayout: some View {
         HStack(alignment: .top, spacing: 24) {
             if let row = selectedRow, let col = selectedCol {
-                calculationBreakdown(row: row, col: col)
+                breakdownPanel(row: row, col: col)
                     .frame(maxWidth: 280)
             }
 
@@ -50,7 +51,7 @@ struct ResultSectionView: View {
     private var iPhoneLayout: some View {
         VStack(spacing: 16) {
             if let row = selectedRow, let col = selectedCol {
-                calculationBreakdown(row: row, col: col)
+                breakdownPanel(row: row, col: col)
                     .transition(.scale.combined(with: .opacity))
                     .frame(maxWidth: contentWidth)
             }
@@ -63,18 +64,29 @@ struct ResultSectionView: View {
 
     // MARK: - Subviews
 
-    private func calculationBreakdown(row: Int, col: Int) -> some View {
-        CalculationBreakdownView(
-            matrixA: matrixA,
-            matrixB: matrixB,
-            resultRow: row,
-            resultCol: col,
-            resultValue: result[row][col],
-            onAnimateTapped: onAnimateTapped,
-            onAnimateAllTapped: onAnimateAllTapped,
-            onAnimateRandomTapped: onAnimateRandomTapped,
-            isAnimatingSequence: isAnimatingSequence || isChangeGameActive
-        )
+    private func breakdownPanel(row: Int, col: Int) -> some View {
+        VStack(spacing: 8) {
+            CalculationBreakdownView(
+                matrixA: matrixA,
+                matrixB: matrixB,
+                resultRow: row,
+                resultCol: col,
+                resultValue: result[row][col],
+                onAnimateTapped: onAnimateTapped,
+                onAnimateAllTapped: onAnimateAllTapped,
+                onAnimateRandomTapped: onAnimateRandomTapped,
+                isAnimatingSequence: isAnimatingSequence || isChangeGameActive
+            )
+
+            if isChangeGameActive {
+                Toggle(isOn: $showOriginalResult) {
+                    Text(showOriginalResult ? "Showing original result" : "Showing changed result")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .toggleStyle(.switch)
+            }
+        }
     }
 
     private var resultMatrixSection: some View {
@@ -139,6 +151,7 @@ private let previewResult = [[10, 20], [30, 40]]
         changedResultCells: [],
         changeGameMessage: nil,
         isChangeGameButtonDisabled: false,
+        showOriginalResult: .constant(false),
         contentWidth: 500,
         onCellSelected: { _, _ in },
         onAnimateTapped: {},
@@ -162,6 +175,7 @@ private let previewResult = [[10, 20], [30, 40]]
         changedResultCells: [],
         changeGameMessage: nil,
         isChangeGameButtonDisabled: false,
+        showOriginalResult: .constant(false),
         contentWidth: 500,
         onCellSelected: { _, _ in },
         onAnimateTapped: {},
@@ -185,6 +199,7 @@ private let previewResult = [[10, 20], [30, 40]]
         changedResultCells: [ResultCellIdentifier(row: 0, col: 0), ResultCellIdentifier(row: 1, col: 1)],
         changeGameMessage: "Find the value that changed.",
         isChangeGameButtonDisabled: false,
+        showOriginalResult: .constant(true),
         contentWidth: 350,
         onCellSelected: { _, _ in },
         onAnimateTapped: {},
@@ -208,6 +223,7 @@ private let previewResult = [[10, 20], [30, 40]]
         changedResultCells: [],
         changeGameMessage: nil,
         isChangeGameButtonDisabled: true,
+        showOriginalResult: .constant(false),
         contentWidth: 500,
         onCellSelected: { _, _ in },
         onAnimateTapped: {},

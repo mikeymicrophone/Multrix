@@ -16,6 +16,8 @@ struct ArithmeticPracticeView: View {
     @State private var showAnswer = false
     @State private var displayMode: ArithmeticDisplayMode = .full
     @State private var sortOption: HistorySortOption = .newest
+    @State private var showingNumberInput = false
+    @State private var editingTarget: OperandEditTarget?
     @Environment(\.modelContext) private var modelContext
     @Query private var historyEntries: [ArithmeticHistoryEntry]
 
@@ -40,38 +42,60 @@ struct ArithmeticPracticeView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                Text(title)
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .padding(.top)
+        ZStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    Text(title)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .padding(.top)
 
-                modePicker
-                problemRow
-                answerRow
-                reviewPanel
+                    modePicker
+                    problemRow
+                    answerRow
+                    reviewPanel
 
-                Spacer(minLength: 0)
+                    Spacer(minLength: 0)
+                }
+                .padding()
             }
-            .padding()
+
+            numberInputOverlay
         }
         .onAppear { ensureUniqueProblem() }
     }
 
     private var problemRow: some View {
         HStack(spacing: 12) {
-            Text(problem.lhsDisplay(mode: displayMode))
-                .font(.title)
-                .fontWeight(.semibold)
+            if supportsDirectOperandEditing {
+                operandView(
+                    text: problem.lhsDisplay(mode: displayMode),
+                    editAccessibilityLabel: "Edit first operand"
+                ) {
+                    startEditing(.lhs)
+                }
 
-            Text(problem.operation.symbol)
-                .font(.title)
-                .fontWeight(.semibold)
+                operationView
 
-            Text(problem.rhsDisplay(mode: displayMode))
-                .font(.title)
-                .fontWeight(.semibold)
+                operandView(
+                    text: problem.rhsDisplay(mode: displayMode),
+                    editAccessibilityLabel: "Edit second operand"
+                ) {
+                    startEditing(.rhs)
+                }
+            } else {
+                Text(problem.lhsDisplay(mode: displayMode))
+                    .font(.title)
+                    .fontWeight(.semibold)
+
+                Text(problem.operation.symbol)
+                    .font(.title)
+                    .fontWeight(.semibold)
+
+                Text(problem.rhsDisplay(mode: displayMode))
+                    .font(.title)
+                    .fontWeight(.semibold)
+            }
 
             Button(action: refreshProblem) {
                 Image(systemName: "arrow.clockwise")
@@ -82,6 +106,56 @@ struct ArithmeticPracticeView: View {
             }
             .accessibilityLabel("New problem")
         }
+    }
+
+    @ViewBuilder
+    private func operandView(
+        text: String,
+        editAccessibilityLabel: String,
+        onEdit: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 6) {
+            Text(text)
+                .font(.title)
+                .fontWeight(.semibold)
+
+            smallEditButton(
+                icon: "pencil",
+                accessibilityLabel: editAccessibilityLabel,
+                action: onEdit
+            )
+        }
+    }
+
+    private var operationView: some View {
+        HStack(spacing: 6) {
+            Text(problem.operation.symbol)
+                .font(.title)
+                .fontWeight(.semibold)
+
+            smallEditButton(
+                icon: "arrow.triangle.2.circlepath",
+                accessibilityLabel: "Toggle operation",
+                action: toggleOperation
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func smallEditButton(
+        icon: String,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.caption)
+                .padding(5)
+                .background(Color.blue.opacity(0.12))
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
     }
 
     private var answerRow: some View {
@@ -150,6 +224,22 @@ struct ArithmeticPracticeView: View {
         .padding(.top, 4)
     }
 
+    @ViewBuilder
+    private var numberInputOverlay: some View {
+        if showingNumberInput {
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    showingNumberInput = false
+                    editingTarget = nil
+                }
+
+            NumberInputView(isPresented: $showingNumberInput) { number in
+                applyNumberInput(number)
+            }
+        }
+    }
+
     private func refreshProblem() {
         recordCurrentProblem()
         problem = generateNextProblem()
@@ -210,6 +300,51 @@ struct ArithmeticPracticeView: View {
         }
     }
 
+    private func startEditing(_ target: OperandEditTarget) {
+        editingTarget = target
+        showingNumberInput = true
+    }
+
+    private func applyNumberInput(_ number: Int) {
+        guard let editingTarget else { return }
+
+        switch editingTarget {
+        case .lhs:
+            setProblem(lhs: Double(number), rhs: problem.rhs, operation: problem.operation)
+        case .rhs:
+            setProblem(lhs: problem.lhs, rhs: Double(number), operation: problem.operation)
+        }
+
+        self.editingTarget = nil
+    }
+
+    private func toggleOperation() {
+        guard !operations.isEmpty else { return }
+        if operations.count == 1 {
+            setProblem(lhs: problem.lhs, rhs: problem.rhs, operation: operations[0])
+            return
+        }
+
+        let nextOperation: ArithmeticOperation
+        if let currentIndex = operations.firstIndex(of: problem.operation) {
+            nextOperation = operations[(currentIndex + 1) % operations.count]
+        } else {
+            nextOperation = operations[0]
+        }
+
+        setProblem(lhs: problem.lhs, rhs: problem.rhs, operation: nextOperation)
+    }
+
+    private func setProblem(lhs: Double, rhs: Double, operation: ArithmeticOperation) {
+        let answer = operation.apply(lhs: lhs, rhs: rhs)
+        problem = ArithmeticProblem(lhs: lhs, rhs: rhs, operation: operation, answer: answer)
+        showAnswer = false
+    }
+
+    private var supportsDirectOperandEditing: Bool {
+        Set(operations) == Set([.addition, .subtraction])
+    }
+
     private func historyKeys() -> Set<HistoryKey> {
         Set(historyEntries.map { historyKey(for: $0) })
     }
@@ -256,7 +391,7 @@ struct ArithmeticPracticeView: View {
 #Preview {
     let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: ArithmeticHistoryEntry.self, configurations: configuration)
-    return ArithmeticPracticeView(
+    ArithmeticPracticeView(
         title: "Addition & Subtraction",
         operations: [.addition, .subtraction],
         historyGroup: "addSub"
@@ -286,4 +421,9 @@ private enum HistorySortOption: String, CaseIterable, Identifiable {
         case .answerDescending: return "Answer (High)"
         }
     }
+}
+
+private enum OperandEditTarget {
+    case lhs
+    case rhs
 }

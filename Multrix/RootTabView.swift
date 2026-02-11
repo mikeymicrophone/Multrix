@@ -38,6 +38,6 @@ struct RootTabView: View {
 #Preview {
     let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: ArithmeticHistoryEntry.self, configurations: configuration)
-    return RootTabView()
+    RootTabView()
         .modelContainer(container)
 }

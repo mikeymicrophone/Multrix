@@ -264,10 +264,11 @@ struct ContentView: View {
                 .onTapGesture { showingNumberInput = false }
 
             NumberInputView(isPresented: $showingNumberInput) { number in
+                let roundedNumber = Int(number.rounded())
                 if editingMatrix == 0 {
-                    matrixA.values[editingRow][editingCol] = number
+                    matrixA.values[editingRow][editingCol] = roundedNumber
                 } else {
-                    matrixB.values[editingRow][editingCol] = number
+                    matrixB.values[editingRow][editingCol] = roundedNumber
                 }
                 if changeGameActive {
                     updateResultForChangeGame()

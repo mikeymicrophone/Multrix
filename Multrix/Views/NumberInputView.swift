@@ -9,18 +9,38 @@ import SwiftUI
 
 struct NumberInputView: View {
     @Binding var isPresented: Bool
-    let onNumberSelected: (Int) -> Void
+    let showsDecimalToggle: Bool
+    let onNumberSelected: (Double) -> Void
 
     @State private var tensMode: Bool = false
-    @State private var tensDigit: Int? = nil
+    @State private var firstDigit: Int? = nil
+    @State private var decimalMode: Bool = false
+
+    init(
+        isPresented: Binding<Bool>,
+        showsDecimalToggle: Bool = false,
+        onNumberSelected: @escaping (Double) -> Void
+    ) {
+        _isPresented = isPresented
+        self.showsDecimalToggle = showsDecimalToggle
+        self.onNumberSelected = onNumberSelected
+    }
 
     private var displayText: String {
-        if let tens = tensDigit {
-            return "\(tens)_"
-        } else if tensMode {
+        if let firstDigit {
+            return decimalMode ? "\(firstDigit)._" : "\(firstDigit)_"
+        }
+        if decimalMode {
+            return "_._"
+        }
+        if tensMode {
             return "_"
         }
         return ""
+    }
+
+    private var showsDisplay: Bool {
+        tensMode || decimalMode || firstDigit != nil
     }
 
     var body: some View {
@@ -28,8 +48,7 @@ struct NumberInputView: View {
             Text("Enter a number")
                 .font(.headline)
 
-            // Show display only when in tens mode
-            if tensMode {
+            if showsDisplay {
                 Text(displayText)
                     .font(.system(size: 36, weight: .bold, design: .rounded))
                     .frame(width: 100, height: 50)
@@ -55,9 +74,8 @@ struct NumberInputView: View {
                 }
             }
 
-            // Bottom row: _0 button, 0, empty space
+            // Bottom row: _0 button, 0, decimal toggle
             HStack(spacing: 12) {
-                // Tens place button
                 Button(action: { tensMode = true }) {
                     Text("_0")
                         .font(.title2)
@@ -80,9 +98,21 @@ struct NumberInputView: View {
                 }
                 .accessibilityIdentifier("numberInput.digit.0")
 
-                // Placeholder for symmetry
-                Color.clear
-                    .frame(width: 60, height: 60)
+                if showsDecimalToggle {
+                    Button(action: toggleDecimalMode) {
+                        Text(".")
+                            .font(.title)
+                            .fontWeight(.medium)
+                            .frame(width: 60, height: 60)
+                            .background(decimalMode ? Color.yellow : Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
+                    .accessibilityIdentifier("numberInput.decimal")
+                } else {
+                    Color.clear
+                        .frame(width: 60, height: 60)
+                }
             }
 
             Button("Cancel") {
@@ -100,19 +130,26 @@ struct NumberInputView: View {
     }
 
     private func digitTapped(_ digit: Int) {
-        if let tens = tensDigit {
-            // We have tens digit, this is the ones digit - complete and submit
-            let number = tens * 10 + digit
-            onNumberSelected(number)
+        if let firstDigit {
+            let value: Double
+            if decimalMode {
+                value = Double(firstDigit) + Double(digit) / 10.0
+            } else {
+                value = Double(firstDigit * 10 + digit)
+            }
+            onNumberSelected(value)
             isPresented = false
-        } else if tensMode {
-            // In tens mode but no tens digit yet - this digit is the tens place
-            tensDigit = digit
+        } else if tensMode || decimalMode {
+            firstDigit = digit
         } else {
-            // Normal mode - single digit, submit immediately
-            onNumberSelected(digit)
+            onNumberSelected(Double(digit))
             isPresented = false
         }
+    }
+
+    private func toggleDecimalMode() {
+        guard showsDecimalToggle else { return }
+        decimalMode.toggle()
     }
 }
 

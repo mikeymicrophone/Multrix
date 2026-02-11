@@ -68,33 +68,46 @@ struct ArithmeticPracticeView: View {
     private var problemRow: some View {
         HStack(spacing: 12) {
             if supportsDirectOperandEditing {
-                operandView(
-                    text: problem.lhsDisplay(mode: displayMode),
-                    editAccessibilityLabel: "Edit first operand"
-                ) {
-                    startEditing(.lhs)
-                }
+                HStack(spacing: 20) {
+                    editableOperandView(
+                        text: problem.lhsDisplay(mode: displayMode),
+                        alignment: .leading,
+                        editIconAlignment: .topLeading,
+                        editIconXOffset: -16,
+                        editAccessibilityLabel: "Edit first operand"
+                    ) {
+                        startEditing(.lhs)
+                    }
 
-                operationView
+                    editableOperationView
 
-                operandView(
-                    text: problem.rhsDisplay(mode: displayMode),
-                    editAccessibilityLabel: "Edit second operand"
-                ) {
-                    startEditing(.rhs)
+                    editableOperandView(
+                        text: problem.rhsDisplay(mode: displayMode),
+                        alignment: .trailing,
+                        editIconAlignment: .topTrailing,
+                        editIconXOffset: 16,
+                        editAccessibilityLabel: "Edit second operand"
+                    ) {
+                        startEditing(.rhs)
+                    }
                 }
+                .frame(maxWidth: .infinity)
             } else {
                 Text(problem.lhsDisplay(mode: displayMode))
-                    .font(.title)
+                    .font(equationFont)
                     .fontWeight(.semibold)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
 
                 Text(problem.operation.symbol)
-                    .font(.title)
+                    .font(equationFont)
                     .fontWeight(.semibold)
 
                 Text(problem.rhsDisplay(mode: displayMode))
-                    .font(.title)
+                    .font(equationFont)
                     .fontWeight(.semibold)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
             }
 
             Button(action: refreshProblem) {
@@ -109,36 +122,42 @@ struct ArithmeticPracticeView: View {
     }
 
     @ViewBuilder
-    private func operandView(
+    private func editableOperandView(
         text: String,
+        alignment: Alignment,
+        editIconAlignment: Alignment,
+        editIconXOffset: CGFloat,
         editAccessibilityLabel: String,
         onEdit: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: 6) {
-            Text(text)
-                .font(.title)
-                .fontWeight(.semibold)
-
-            smallEditButton(
-                icon: "pencil",
-                accessibilityLabel: editAccessibilityLabel,
-                action: onEdit
-            )
-        }
+        Text(text)
+            .font(equationFont)
+            .fontWeight(.semibold)
+            .minimumScaleFactor(0.5)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: alignment)
+            .overlay(alignment: editIconAlignment) {
+                smallEditButton(
+                    icon: "pencil",
+                    accessibilityLabel: editAccessibilityLabel,
+                    action: onEdit
+                )
+                .offset(x: editIconXOffset, y: -22)
+            }
     }
 
-    private var operationView: some View {
-        HStack(spacing: 6) {
-            Text(problem.operation.symbol)
-                .font(.title)
-                .fontWeight(.semibold)
-
-            smallEditButton(
-                icon: "arrow.triangle.2.circlepath",
-                accessibilityLabel: "Toggle operation",
-                action: toggleOperation
-            )
-        }
+    private var editableOperationView: some View {
+        Text(problem.operation.symbol)
+            .font(equationFont)
+            .fontWeight(.semibold)
+            .overlay(alignment: .top) {
+                smallEditButton(
+                    icon: "arrow.triangle.2.circlepath",
+                    accessibilityLabel: "Toggle operation",
+                    action: toggleOperation
+                )
+                .offset(y: -26)
+            }
     }
 
     @ViewBuilder
@@ -156,6 +175,10 @@ struct ArithmeticPracticeView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var equationFont: Font {
+        .system(size: 46, weight: .bold, design: .rounded)
     }
 
     private var answerRow: some View {
@@ -234,7 +257,10 @@ struct ArithmeticPracticeView: View {
                     editingTarget = nil
                 }
 
-            NumberInputView(isPresented: $showingNumberInput) { number in
+            NumberInputView(
+                isPresented: $showingNumberInput,
+                showsDecimalToggle: true
+            ) { number in
                 applyNumberInput(number)
             }
         }
@@ -305,14 +331,14 @@ struct ArithmeticPracticeView: View {
         showingNumberInput = true
     }
 
-    private func applyNumberInput(_ number: Int) {
+    private func applyNumberInput(_ number: Double) {
         guard let editingTarget else { return }
 
         switch editingTarget {
         case .lhs:
-            setProblem(lhs: Double(number), rhs: problem.rhs, operation: problem.operation)
+            setProblem(lhs: number, rhs: problem.rhs, operation: problem.operation)
         case .rhs:
-            setProblem(lhs: problem.lhs, rhs: Double(number), operation: problem.operation)
+            setProblem(lhs: problem.lhs, rhs: number, operation: problem.operation)
         }
 
         self.editingTarget = nil

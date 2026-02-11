@@ -5,7 +5,7 @@
 
 import Foundation
 
-enum ArithmeticOperation: CaseIterable {
+enum ArithmeticOperation: String, CaseIterable {
     case addition
     case subtraction
     case multiplication
@@ -34,14 +34,38 @@ enum ArithmeticOperation: CaseIterable {
     }
 }
 
+enum ArithmeticDisplayMode: String, CaseIterable {
+    case full
+    case thousands
+    case millions
+
+    var title: String {
+        switch self {
+        case .full: return "Full"
+        case .thousands: return "K"
+        case .millions: return "M"
+        }
+    }
+
+    var suffix: String {
+        switch self {
+        case .full: return ""
+        case .thousands: return "K"
+        case .millions: return "M"
+        }
+    }
+}
+
 struct ArithmeticProblemSettings {
     var minOperandValue: Double = 1
-    var maxOperandValue: Double = 9_900_000
+    var maxOperandValue: Double = 999
     var lowRangeFraction: Double = 0.05
     var lowRangeProbability: Double = 0.9
-    var maxAnswerValue: Double = 999_000_000
+    var maxAnswerValue: Double = 999_999
     var maxAttempts: Int = 80
     var lowRangeSkewPower: Double = 2.2
+    var decimalProbability: Double = 0.35
+    var decimalStep: Double = 0.1
 }
 
 struct ArithmeticProblem: Identifiable {
@@ -51,53 +75,46 @@ struct ArithmeticProblem: Identifiable {
     let operation: ArithmeticOperation
     let answer: Double
 
-    var lhsDisplay: String {
-        ArithmeticNumberFormatter.formatOperand(lhs)
+    func lhsDisplay(mode: ArithmeticDisplayMode) -> String {
+        ArithmeticNumberFormatter.formatOperand(lhs, mode: mode)
     }
 
-    var rhsDisplay: String {
-        ArithmeticNumberFormatter.formatOperand(rhs)
+    func rhsDisplay(mode: ArithmeticDisplayMode) -> String {
+        ArithmeticNumberFormatter.formatOperand(rhs, mode: mode)
     }
 
-    var answerDisplay: String {
-        ArithmeticNumberFormatter.formatAnswer(answer)
+    func answerDisplay(mode: ArithmeticDisplayMode) -> String {
+        ArithmeticNumberFormatter.formatAnswer(answer, mode: mode)
     }
 }
 
 enum ArithmeticNumberFormatter {
     private static let epsilon = 0.000001
 
-    static func formatOperand(_ value: Double) -> String {
+    static func formatOperand(_ value: Double, mode: ArithmeticDisplayMode) -> String {
+        let formatted = formatMantissa(value, maxFractionDigits: 1)
+        return mode == .full ? formatted : formatted + mode.suffix
+    }
+
+    static func formatAnswer(_ value: Double, mode: ArithmeticDisplayMode) -> String {
+        let formatted = formatMantissa(value, maxFractionDigits: 2)
+        return mode == .full ? formatted : formatted + mode.suffix
+    }
+
+    private static func formatMantissa(_ value: Double, maxFractionDigits: Int) -> String {
         let sign = value < 0 ? "-" : ""
         let absValue = abs(value)
 
-        if absValue >= 1_000_000 {
-            return sign + formatAbbreviated(absValue / 1_000_000, suffix: "M")
+        if isNearlyInteger(absValue) || maxFractionDigits == 0 {
+            let intValue = Int(absValue.rounded())
+            return sign + intValue.formatted(.number.grouping(.automatic))
         }
-        if absValue >= 1_000 {
-            return sign + formatAbbreviated(absValue / 1_000, suffix: "K")
-        }
-        return sign + String(Int(absValue.rounded()))
-    }
 
-    static func formatAnswer(_ value: Double) -> String {
-        if isNearlyInteger(value) {
-            let intValue = Int(value.rounded())
-            return intValue.formatted(.number.grouping(.automatic))
-        }
-        return value.formatted(
+        return sign + absValue.formatted(
             .number
                 .grouping(.automatic)
-                .precision(.fractionLength(0...2))
+                .precision(.fractionLength(0...maxFractionDigits))
         )
-    }
-
-    private static func formatAbbreviated(_ value: Double, suffix: String) -> String {
-        let rounded = (value * 10).rounded() / 10
-        if isNearlyInteger(rounded) {
-            return "\(Int(rounded))\(suffix)"
-        }
-        return String(format: "%.1f%@", rounded, suffix)
     }
 
     private static func isNearlyInteger(_ value: Double) -> Bool {
@@ -106,13 +123,7 @@ enum ArithmeticNumberFormatter {
 }
 
 struct ArithmeticProblemGenerator {
-    private static let smallMax: Double = 999
-    private static let thousandMin: Double = 1_000
-    private static let thousandMax: Double = 999_900
-    private static let thousandStep: Double = 100
-    private static let millionMin: Double = 1_000_000
-    private static let millionMax: Double = 9_900_000
-    private static let millionStep: Double = 100_000
+    private static let epsilon = 0.000001
 
     static func generate(operations: [ArithmeticOperation], settings: ArithmeticProblemSettings) -> ArithmeticProblem {
         let operation = operations.randomElement() ?? .addition
@@ -208,33 +219,33 @@ struct ArithmeticProblemGenerator {
     private static func randomOperand(
         in range: ClosedRange<Double>,
         skewPower: Double,
-        settings: ArithmeticProblemSettings
+        settings: ArithmeticProblemSettings,
+        allowDecimals: Bool = true
     ) -> Double {
         let t = pow(Double.random(in: 0...1), skewPower)
         let raw = range.lowerBound + t * (range.upperBound - range.lowerBound)
-        return snapDisplayable(raw, settings: settings)
+        return snapValue(raw, allowDecimals: allowDecimals, settings: settings)
     }
 
-    private static func snapDisplayable(_ value: Double, settings: ArithmeticProblemSettings) -> Double {
+    private static func snapValue(
+        _ value: Double,
+        allowDecimals: Bool,
+        settings: ArithmeticProblemSettings
+    ) -> Double {
         let minValue = settings.minOperandValue
         let maxValue = settings.maxOperandValue
-        let clamped = min(max(value, minValue), maxValue)
+        var clamped = min(max(value, minValue), maxValue)
 
-        if clamped <= smallMax || maxValue <= smallMax {
-            return min(max(clamped.rounded(), minValue), min(maxValue, smallMax))
+        if allowDecimals, Double.random(in: 0...1) < settings.decimalProbability {
+            let step = max(settings.decimalStep, 0.01)
+            clamped = (clamped / step).rounded() * step
+        } else {
+            clamped = clamped.rounded()
         }
 
-        if clamped < millionMin || maxValue < millionMin {
-            let minBound = max(thousandMin, minValue)
-            let maxBound = min(thousandMax, maxValue)
-            let stepped = (clamped / thousandStep).rounded() * thousandStep
-            return min(max(stepped, minBound), maxBound)
-        }
-
-        let minBound = max(millionMin, minValue)
-        let maxBound = min(millionMax, maxValue)
-        let stepped = (clamped / millionStep).rounded() * millionStep
-        return min(max(stepped, minBound), maxBound)
+        if clamped < minValue { clamped = minValue }
+        if clamped > maxValue { clamped = maxValue }
+        return clamped
     }
 
     private static func isDisplayable(_ value: Double, settings: ArithmeticProblemSettings) -> Bool {
@@ -242,21 +253,17 @@ struct ArithmeticProblemGenerator {
         let maxValue = settings.maxOperandValue
         if value < minValue || value > maxValue { return false }
 
-        if value <= smallMax {
-            return isNearlyInteger(value)
-        }
-        if value < millionMin {
-            return isMultiple(value, step: thousandStep)
-        }
-        return isMultiple(value, step: millionStep)
+        if isNearlyInteger(value) { return true }
+        let step = max(settings.decimalStep, 0.01)
+        return isMultiple(value, step: step)
     }
 
     private static func isMultiple(_ value: Double, step: Double) -> Bool {
         let scaled = (value / step).rounded() * step
-        return abs(scaled - value) < 0.000001
+        return abs(scaled - value) < epsilon
     }
 
     private static func isNearlyInteger(_ value: Double) -> Bool {
-        abs(value - value.rounded()) < 0.000001
+        abs(value - value.rounded()) < epsilon
     }
 }

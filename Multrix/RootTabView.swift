@@ -4,13 +4,15 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct RootTabView: View {
     var body: some View {
         TabView {
             ArithmeticPracticeView(
                 title: "Addition & Subtraction",
-                operations: [.addition, .subtraction]
+                operations: [.addition, .subtraction],
+                historyGroup: "addSub"
             )
             .tabItem {
                 Label("Add/Sub", systemImage: "plusminus")
@@ -18,7 +20,8 @@ struct RootTabView: View {
 
             ArithmeticPracticeView(
                 title: "Multiplication & Division",
-                operations: [.multiplication, .division]
+                operations: [.multiplication, .division],
+                historyGroup: "mulDiv"
             )
             .tabItem {
                 Label("Mul/Div", systemImage: "multiply")
@@ -33,5 +36,8 @@ struct RootTabView: View {
 }
 
 #Preview {
-    RootTabView()
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: ArithmeticHistoryEntry.self, configurations: configuration)
+    return RootTabView()
+        .modelContainer(container)
 }

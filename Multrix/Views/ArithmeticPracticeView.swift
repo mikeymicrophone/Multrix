@@ -50,10 +50,25 @@ struct ArithmeticPracticeView: View {
                         .fontWeight(.bold)
                         .padding(.top)
 
-                    modePicker
-                    problemRow
-                    answerRow
-                    reviewPanel
+                    ArithmeticModePickerView(displayMode: $displayMode)
+                    ArithmeticEquationRowView(
+                        problem: problem,
+                        displayMode: displayMode,
+                        onEditLhs: { startEditing(.lhs) },
+                        onToggleOperation: toggleOperation,
+                        onEditRhs: { startEditing(.rhs) },
+                        onRefresh: refreshProblem
+                    )
+                    ArithmeticAnswerRowView(
+                        problem: problem,
+                        displayMode: displayMode,
+                        showAnswer: showAnswer,
+                        onToggleShowAnswer: toggleShowAnswer
+                    )
+                    ArithmeticReviewPanelView(
+                        historyEntries: sortedHistoryEntries,
+                        sortOption: $sortOption
+                    )
 
                     Spacer(minLength: 0)
                 }
@@ -63,188 +78,6 @@ struct ArithmeticPracticeView: View {
             numberInputOverlay
         }
         .onAppear { ensureUniqueProblem() }
-    }
-
-    private var problemRow: some View {
-        HStack(spacing: 12) {
-            if supportsDirectOperandEditing {
-                HStack(spacing: 20) {
-                    editableOperandView(
-                        text: problem.lhsDisplay(mode: displayMode),
-                        alignment: .leading,
-                        editIconAlignment: .topLeading,
-                        editIconXOffset: -16,
-                        editAccessibilityLabel: "Edit first operand"
-                    ) {
-                        startEditing(.lhs)
-                    }
-
-                    editableOperationView
-
-                    editableOperandView(
-                        text: problem.rhsDisplay(mode: displayMode),
-                        alignment: .trailing,
-                        editIconAlignment: .topTrailing,
-                        editIconXOffset: 16,
-                        editAccessibilityLabel: "Edit second operand"
-                    ) {
-                        startEditing(.rhs)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            } else {
-                Text(problem.lhsDisplay(mode: displayMode))
-                    .font(equationFont)
-                    .fontWeight(.semibold)
-                    .minimumScaleFactor(0.5)
-                    .lineLimit(1)
-
-                Text(problem.operation.symbol)
-                    .font(equationFont)
-                    .fontWeight(.semibold)
-
-                Text(problem.rhsDisplay(mode: displayMode))
-                    .font(equationFont)
-                    .fontWeight(.semibold)
-                    .minimumScaleFactor(0.5)
-                    .lineLimit(1)
-            }
-
-            Button(action: refreshProblem) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.title3)
-                    .padding(8)
-                    .background(Color.blue.opacity(0.12))
-                    .clipShape(Circle())
-            }
-            .accessibilityLabel("New problem")
-        }
-    }
-
-    @ViewBuilder
-    private func editableOperandView(
-        text: String,
-        alignment: Alignment,
-        editIconAlignment: Alignment,
-        editIconXOffset: CGFloat,
-        editAccessibilityLabel: String,
-        onEdit: @escaping () -> Void
-    ) -> some View {
-        Text(text)
-            .font(equationFont)
-            .fontWeight(.semibold)
-            .minimumScaleFactor(0.5)
-            .lineLimit(1)
-            .frame(maxWidth: .infinity, alignment: alignment)
-            .overlay(alignment: editIconAlignment) {
-                smallEditButton(
-                    icon: "pencil",
-                    accessibilityLabel: editAccessibilityLabel,
-                    action: onEdit
-                )
-                .offset(x: editIconXOffset, y: -22)
-            }
-    }
-
-    private var editableOperationView: some View {
-        Text(problem.operation.symbol)
-            .font(equationFont)
-            .fontWeight(.semibold)
-            .overlay(alignment: .top) {
-                smallEditButton(
-                    icon: "arrow.triangle.2.circlepath",
-                    accessibilityLabel: "Toggle operation",
-                    action: toggleOperation
-                )
-                .offset(y: -26)
-            }
-    }
-
-    @ViewBuilder
-    private func smallEditButton(
-        icon: String,
-        accessibilityLabel: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.caption)
-                .padding(5)
-                .background(Color.blue.opacity(0.12))
-                .clipShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(accessibilityLabel)
-    }
-
-    private var equationFont: Font {
-        .system(size: 46, weight: .bold, design: .rounded)
-    }
-
-    private var answerRow: some View {
-        HStack(spacing: 12) {
-            Text("=")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Text(showAnswer ? problem.answerDisplay(mode: displayMode) : "...")
-                .font(.title2)
-                .fontWeight(.semibold)
-                .monospacedDigit()
-
-            Button(showAnswer ? "Hide" : "Show") {
-                let nextValue = !showAnswer
-                if nextValue {
-                    recordCurrentProblem()
-                }
-                showAnswer = nextValue
-            }
-            .buttonStyle(.bordered)
-        }
-    }
-
-    private var reviewPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 12) {
-                Text("Review")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-
-                Spacer()
-
-                Picker("Sort", selection: $sortOption) {
-                    ForEach(HistorySortOption.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.menu)
-            }
-
-            if historyEntries.isEmpty {
-                Text("No completed problems yet.")
-                    .foregroundStyle(.secondary)
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(sortedHistoryEntries.prefix(20)) { item in
-                        HStack {
-                            Text("\(item.lhsDisplay) \(item.operation.symbol) \(item.rhsDisplay)")
-                                .font(.subheadline)
-
-                            Spacer()
-
-                            Text("= \(item.answerDisplay)")
-                                .font(.subheadline)
-                                .monospacedDigit()
-                        }
-                        .padding(10)
-                        .background(Color.gray.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 4)
     }
 
     @ViewBuilder
@@ -264,6 +97,14 @@ struct ArithmeticPracticeView: View {
                 applyNumberInput(number)
             }
         }
+    }
+
+    private func toggleShowAnswer() {
+        let nextValue = !showAnswer
+        if nextValue {
+            recordCurrentProblem()
+        }
+        showAnswer = nextValue
     }
 
     private func refreshProblem() {
@@ -367,10 +208,6 @@ struct ArithmeticPracticeView: View {
         showAnswer = false
     }
 
-    private var supportsDirectOperandEditing: Bool {
-        Set(operations) == Set([.addition, .subtraction])
-    }
-
     private func historyKeys() -> Set<HistoryKey> {
         Set(historyEntries.map { historyKey(for: $0) })
     }
@@ -396,22 +233,6 @@ struct ArithmeticPracticeView: View {
         let factor = Int((1.0 / step).rounded())
         return Int((value * Double(factor)).rounded())
     }
-
-    private var modePicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Mode")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Picker("Mode", selection: $displayMode) {
-                ForEach(ArithmeticDisplayMode.allCases, id: \.self) { mode in
-                    Text(mode.title).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
 }
 
 #Preview {
@@ -431,7 +252,7 @@ private struct HistoryKey: Hashable {
     let rhsScaled: Int
 }
 
-private enum HistorySortOption: String, CaseIterable, Identifiable {
+enum HistorySortOption: String, CaseIterable, Identifiable {
     case newest
     case oldest
     case answerAscending

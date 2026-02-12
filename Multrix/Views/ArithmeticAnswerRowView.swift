@@ -10,6 +10,8 @@ struct ArithmeticAnswerRowView: View {
     let displayMode: ArithmeticDisplayMode
     let showAnswer: Bool
     let onToggleShowAnswer: () -> Void
+    let canExplain: Bool
+    let onExplain: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -26,6 +28,13 @@ struct ArithmeticAnswerRowView: View {
                 onToggleShowAnswer()
             }
             .buttonStyle(.bordered)
+
+            if showAnswer && canExplain {
+                Button("Explain") {
+                    onExplain()
+                }
+                .buttonStyle(.borderedProminent)
+            }
         }
     }
 }

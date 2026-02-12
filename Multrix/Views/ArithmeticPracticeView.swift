@@ -17,6 +17,7 @@ struct ArithmeticPracticeView: View {
     @State private var displayMode: ArithmeticDisplayMode = .full
     @State private var sortOption: HistorySortOption = .newest
     @State private var showingNumberInput = false
+    @State private var showingExplanation = false
     @State private var editingTarget: OperandEditTarget?
     @Environment(\.modelContext) private var modelContext
     @Query private var historyEntries: [ArithmeticHistoryEntry]
@@ -63,7 +64,9 @@ struct ArithmeticPracticeView: View {
                         problem: problem,
                         displayMode: displayMode,
                         showAnswer: showAnswer,
-                        onToggleShowAnswer: toggleShowAnswer
+                        onToggleShowAnswer: toggleShowAnswer,
+                        canExplain: canExplain(problem),
+                        onExplain: { showingExplanation = true }
                     )
                     ArithmeticReviewPanelView(
                         historyEntries: sortedHistoryEntries,
@@ -78,6 +81,9 @@ struct ArithmeticPracticeView: View {
             numberInputOverlay
         }
         .onAppear { ensureUniqueProblem() }
+        .sheet(isPresented: $showingExplanation) {
+            ArithmeticExplanationSheetView(problem: problem)
+        }
     }
 
     @ViewBuilder
@@ -103,6 +109,8 @@ struct ArithmeticPracticeView: View {
         let nextValue = !showAnswer
         if nextValue {
             recordCurrentProblem()
+        } else {
+            showingExplanation = false
         }
         showAnswer = nextValue
     }
@@ -111,6 +119,7 @@ struct ArithmeticPracticeView: View {
         recordCurrentProblem()
         problem = generateNextProblem()
         showAnswer = false
+        showingExplanation = false
     }
 
     private func recordCurrentProblem() {
@@ -164,6 +173,7 @@ struct ArithmeticPracticeView: View {
         if historyEntries.contains(where: { historyKey(for: $0) == key }) {
             problem = generateNextProblem()
             showAnswer = false
+            showingExplanation = false
         }
     }
 
@@ -183,6 +193,7 @@ struct ArithmeticPracticeView: View {
         }
 
         self.editingTarget = nil
+        showingExplanation = false
     }
 
     private func toggleOperation() {
@@ -206,6 +217,11 @@ struct ArithmeticPracticeView: View {
         let answer = operation.apply(lhs: lhs, rhs: rhs)
         problem = ArithmeticProblem(lhs: lhs, rhs: rhs, operation: operation, answer: answer)
         showAnswer = false
+        showingExplanation = false
+    }
+
+    private func canExplain(_ problem: ArithmeticProblem) -> Bool {
+        ArithmeticExplanationSupport.canExplain(problem)
     }
 
     private func historyKeys() -> Set<HistoryKey> {

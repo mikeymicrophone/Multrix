@@ -378,7 +378,6 @@ private struct AddSubWork {
         let lhsFraction = ExplanationMath.fractionDigits(for: problem.lhs)
         let rhsFraction = ExplanationMath.fractionDigits(for: problem.rhs)
         let fractionDigits = max(lhsFraction, rhsFraction)
-        let scale = ExplanationMath.pow10(fractionDigits)
 
         let lhsScaled = ExplanationMath.scaledInt(problem.lhs, fractionDigits: fractionDigits)
         let rhsScaled = ExplanationMath.scaledInt(problem.rhs, fractionDigits: fractionDigits)
@@ -411,40 +410,37 @@ private struct AddSubWork {
         let borrowReceivers: Set<Int>
         let crossedColumns: Set<Int>
         let adjustedDigits: [Int: Int]
-        let steps: [String]
+        var steps: [String]
 
         switch problem.operation {
         case .addition:
-            let addition = buildAddition(lhsDigits: lhsDigits, rhsDigits: rhsDigits)
+            let addition = buildAddition(lhsDigits: lhsDigits, rhsDigits: rhsDigits, fractionDigits: fractionDigits)
             resultDigits = addition.resultDigits
             carryTargets = addition.carryTargets
             borrowReceivers = []
             crossedColumns = []
             adjustedDigits = [:]
-            steps = additionSteps(
-                carryTargets: carryTargets,
-                fractionDigits: fractionDigits,
-                lhs: problem.lhs,
-                rhs: problem.rhs,
-                scale: scale
-            )
+            steps = addition.steps
         case .subtraction:
-            let subtraction = buildSubtraction(lhsDigits: lhsDigits, rhsDigits: rhsDigits)
+            let subtraction = buildSubtraction(lhsDigits: lhsDigits, rhsDigits: rhsDigits, fractionDigits: fractionDigits)
             resultDigits = subtraction.resultDigits
             carryTargets = [:]
             borrowReceivers = subtraction.borrowReceivers
             crossedColumns = subtraction.crossedColumns
             adjustedDigits = subtraction.adjustedDigits
-            steps = subtractionSteps(
-                borrowReceivers: borrowReceivers,
-                fractionDigits: fractionDigits,
-                lhs: problem.lhs,
-                rhs: problem.rhs,
-                scale: scale
-            )
+            steps = subtraction.steps
         default:
             return nil
         }
+
+        if fractionDigits > 0 {
+            let lhsText = ExplanationMath.fixedDecimalString(problem.lhs, fractionDigits: fractionDigits)
+            let rhsText = ExplanationMath.fixedDecimalString(problem.rhs, fractionDigits: fractionDigits)
+            steps.insert("Align decimals: \(lhsText) and \(rhsText).", at: 0)
+        }
+
+        let resultText = ExplanationMath.scaledIntegerString(rawResult, fractionDigits: fractionDigits)
+        steps.append("Result: \(resultText).")
 
         let columns = buildColumns(totalDigits: totalDigits, fractionDigits: fractionDigits)
 
@@ -461,33 +457,56 @@ private struct AddSubWork {
         )
     }
 
-    private static func buildAddition(lhsDigits: [Int], rhsDigits: [Int]) -> AdditionBuildResult {
+    private static func buildAddition(
+        lhsDigits: [Int],
+        rhsDigits: [Int],
+        fractionDigits: Int
+    ) -> AdditionBuildResult {
         let width = lhsDigits.count
         var result = Array(repeating: 0, count: width)
         var carries: [Int: Int] = [:]
         var carry = 0
+        var steps: [String] = []
 
         for index in 0..<width {
-            let sum = lhsDigits[index] + rhsDigits[index] + carry
+            let incomingCarry = carry
+            let sum = lhsDigits[index] + rhsDigits[index] + incomingCarry
             result[index] = sum % 10
             let nextCarry = sum / 10
             if nextCarry > 0, index + 1 < width {
                 carries[index + 1] = nextCarry
             }
+
+            let place = ExplanationMath.placeName(for: index, fractionDigits: fractionDigits)
+            if incomingCarry > 0 {
+                let carryText = nextCarry > 0 ? ", carry \(nextCarry)" : ""
+                steps.append("\(place): \(lhsDigits[index]) + \(rhsDigits[index]) + \(incomingCarry) = \(sum), write \(result[index])\(carryText).")
+            } else {
+                let carryText = nextCarry > 0 ? ", carry \(nextCarry)" : ""
+                steps.append("\(place): \(lhsDigits[index]) + \(rhsDigits[index]) = \(sum), write \(result[index])\(carryText).")
+            }
+
             carry = nextCarry
         }
 
-        return AdditionBuildResult(resultDigits: result, carryTargets: carries)
+        return AdditionBuildResult(resultDigits: result, carryTargets: carries, steps: steps)
     }
 
-    private static func buildSubtraction(lhsDigits: [Int], rhsDigits: [Int]) -> SubtractionBuildResult {
+    private static func buildSubtraction(
+        lhsDigits: [Int],
+        rhsDigits: [Int],
+        fractionDigits: Int
+    ) -> SubtractionBuildResult {
         let width = lhsDigits.count
         var working = lhsDigits
         var result = Array(repeating: 0, count: width)
         var borrowReceivers: Set<Int> = []
         var crossedColumns: Set<Int> = []
+        var steps: [String] = []
 
         for index in 0..<width {
+            let place = ExplanationMath.placeName(for: index, fractionDigits: fractionDigits)
+
             if working[index] < rhsDigits[index] {
                 var donor = index + 1
                 while donor < width, working[donor] == 0 {
@@ -496,21 +515,29 @@ private struct AddSubWork {
 
                 if donor >= width { continue }
 
+                var borrowParts: [String] = []
                 working[donor] -= 1
                 crossedColumns.insert(donor)
+                borrowParts.append("\(ExplanationMath.placeName(for: donor, fractionDigits: fractionDigits)) drops to \(working[donor])")
 
                 if donor - index > 1 {
                     for intermediate in stride(from: donor - 1, through: index + 1, by: -1) {
                         working[intermediate] += 9
                         crossedColumns.insert(intermediate)
+                        borrowParts.append("\(ExplanationMath.placeName(for: intermediate, fractionDigits: fractionDigits)) becomes \(working[intermediate])")
                     }
                 }
 
                 working[index] += 10
                 borrowReceivers.insert(index)
+
+                let borrowReason = "\(place): \(working[index] - 10) is less than \(rhsDigits[index]), borrow 1."
+                let borrowEffect = borrowParts.joined(separator: "; ")
+                steps.append("\(borrowReason) \(borrowEffect); \(place) is now \(working[index]).")
             }
 
             result[index] = working[index] - rhsDigits[index]
+            steps.append("\(place): \(working[index]) - \(rhsDigits[index]) = \(result[index]).")
         }
 
         let adjustedDigits = crossedColumns.reduce(into: [:]) { partial, index in
@@ -521,7 +548,8 @@ private struct AddSubWork {
             resultDigits: result,
             borrowReceivers: borrowReceivers,
             crossedColumns: crossedColumns,
-            adjustedDigits: adjustedDigits
+            adjustedDigits: adjustedDigits,
+            steps: steps
         )
     }
 
@@ -538,71 +566,10 @@ private struct AddSubWork {
         return columns
     }
 
-    private static func additionSteps(
-        carryTargets: [Int: Int],
-        fractionDigits: Int,
-        lhs: Double,
-        rhs: Double,
-        scale: Int
-    ) -> [String] {
-        var steps: [String] = []
-
-        if fractionDigits > 0 {
-            let lhsText = ExplanationMath.fixedDecimalString(lhs, fractionDigits: fractionDigits)
-            let rhsText = ExplanationMath.fixedDecimalString(rhs, fractionDigits: fractionDigits)
-            steps.append("Align decimal points so every column has the same place value: \(lhsText) and \(rhsText).")
-        }
-
-        steps.append("Add from right to left, one column at a time.")
-
-        if !carryTargets.isEmpty {
-            steps.append("When a column is 10 or more, write the ones digit and carry the extra 1 to the next column.")
-        }
-
-        let placeValue = fractionDigits > 0 ? " (using tenths/hundredths as needed)" : ""
-        steps.append("Read the total below the line\(placeValue).")
-
-        if fractionDigits > 0, scale > 1 {
-            steps.append("The decimal stays aligned all the way through the sum.")
-        }
-
-        return steps
-    }
-
-    private static func subtractionSteps(
-        borrowReceivers: Set<Int>,
-        fractionDigits: Int,
-        lhs: Double,
-        rhs: Double,
-        scale: Int
-    ) -> [String] {
-        var steps: [String] = []
-
-        if fractionDigits > 0 {
-            let lhsText = ExplanationMath.fixedDecimalString(lhs, fractionDigits: fractionDigits)
-            let rhsText = ExplanationMath.fixedDecimalString(rhs, fractionDigits: fractionDigits)
-            steps.append("Align decimal points first: \(lhsText) and \(rhsText).")
-        }
-
-        steps.append("Subtract from right to left, one column at a time.")
-
-        if !borrowReceivers.isEmpty {
-            steps.append("If the top digit is smaller, borrow 1 from the next column to the left. The borrowed-from digit is crossed out and reduced.")
-        }
-
-        let placeValue = fractionDigits > 0 ? "with decimal places kept in alignment" : ""
-        steps.append("Write the difference below the line \(placeValue).".trimmingCharacters(in: .whitespaces))
-
-        if fractionDigits > 0, scale > 1 {
-            steps.append("Borrowing can move across the decimal point just like any other place-value column.")
-        }
-
-        return steps
-    }
-
     private struct AdditionBuildResult {
         let resultDigits: [Int]
         let carryTargets: [Int: Int]
+        let steps: [String]
     }
 
     private struct SubtractionBuildResult {
@@ -610,6 +577,7 @@ private struct AddSubWork {
         let borrowReceivers: Set<Int>
         let crossedColumns: Set<Int>
         let adjustedDigits: [Int: Int]
+        let steps: [String]
     }
 }
 
@@ -652,7 +620,11 @@ private struct MultiplicationWork {
             lhsInteger: lhsInteger,
             rhsInteger: rhsInteger,
             rhsDigits: rhsDigits,
-            fractionTotal: fractionTotal
+            lhsFraction: lhsFraction,
+            rhsFraction: rhsFraction,
+            fractionTotal: fractionTotal,
+            rawProduct: rawProduct,
+            partialRows: partialRows
         )
 
         return MultiplicationWork(
@@ -670,26 +642,41 @@ private struct MultiplicationWork {
         lhsInteger: Int,
         rhsInteger: Int,
         rhsDigits: [Int],
-        fractionTotal: Int
+        lhsFraction: Int,
+        rhsFraction: Int,
+        fractionTotal: Int,
+        rawProduct: Int,
+        partialRows: [String]
     ) -> [String] {
         var steps: [String] = []
 
         if fractionTotal > 0 {
-            steps.append("Ignore decimals first: multiply \(lhsInteger) by \(rhsInteger).")
+            let lhsText = ExplanationMath.fixedDecimalString(lhs, fractionDigits: lhsFraction)
+            let rhsText = ExplanationMath.fixedDecimalString(rhs, fractionDigits: rhsFraction)
+            steps.append("Treat as whole numbers first: \(lhsText) × \(rhsText) -> \(lhsInteger) × \(rhsInteger).")
+        }
+
+        for (offset, digit) in rhsDigits.enumerated() {
+            let partial = lhsInteger * digit
+            if offset == 0 {
+                steps.append("Ones place: \(lhsInteger) × \(digit) = \(partial).")
+            } else {
+                let shifted = partial * ExplanationMath.pow10(offset)
+                steps.append("10^\(offset) place digit \(digit): \(lhsInteger) × \(digit) = \(partial), then shift \(offset) place(s) -> \(shifted).")
+            }
+        }
+
+        if partialRows.count > 1 {
+            steps.append("\(partialRows.joined(separator: " + ")) = \(rawProduct).")
         } else {
-            steps.append("Multiply from right to left, creating a partial product for each digit in the bottom number.")
+            steps.append("Product = \(rawProduct).")
         }
-
-        if rhsDigits.count > 1 {
-            steps.append("Each new partial product shifts one place left (shown as trailing zeros).")
-        }
-
-        steps.append("Add all partial products to get the raw product.")
 
         if fractionTotal > 0 {
-            let lhsPlaces = ExplanationMath.fractionDigits(for: lhs)
-            let rhsPlaces = ExplanationMath.fractionDigits(for: rhs)
-            steps.append("Put the decimal back with \(lhsPlaces + rhsPlaces) total decimal place(s) (\(lhsPlaces) from the top number and \(rhsPlaces) from the bottom number).")
+            let finalText = ExplanationMath.scaledIntegerString(rawProduct, fractionDigits: fractionTotal)
+            steps.append("Decimal places: \(lhsFraction) + \(rhsFraction) = \(fractionTotal), so \(rawProduct) becomes \(finalText).")
+        } else {
+            steps.append("Result: \(rawProduct).")
         }
 
         return steps
@@ -726,8 +713,7 @@ private struct DivisionWork {
         let notationLines = buildNotationLines(
             divisorText: String(normalizedDivisor),
             dividendText: String(normalizedDividend),
-            quotientText: longDivision.quotientText,
-            steps: longDivision.steps
+            quotientText: longDivision.quotientText
         )
 
         var steps: [String] = []
@@ -739,15 +725,9 @@ private struct DivisionWork {
         }
 
         if longDivision.steps.isEmpty {
-            steps.append("The divisor goes into the dividend exactly, so the quotient is read directly.")
+            steps.append("\(normalizedDivisor) goes into \(normalizedDividend) exactly, so the quotient is \(longDivision.quotientText).")
         } else {
-            steps.append(contentsOf: longDivision.steps.prefix(4).enumerated().map { index, item in
-                "Long division step \(index + 1): \(item)"
-            })
-
-            if longDivision.steps.count > 4 {
-                steps.append("Continue the same divide-subtract-bring down pattern until the remainder is 0.")
-            }
+            steps.append(contentsOf: longDivision.steps)
         }
 
         let shownAnswer = ArithmeticNumberFormatter.formatAnswer(problem.answer, mode: .full)
@@ -765,12 +745,10 @@ private struct DivisionWork {
         var remainder = 0
         var quotient = ""
         var hasStarted = false
-        var consumedDigits = 0
         var stepDetails: [LongDivisionStep] = []
 
         for digit in integerDigits {
             remainder = remainder * 10 + digit
-            consumedDigits += 1
 
             if remainder < divisor {
                 if hasStarted {
@@ -788,7 +766,6 @@ private struct DivisionWork {
 
             stepDetails.append(
                 LongDivisionStep(
-                    consumedDigits: consumedDigits,
                     workingValue: remainder,
                     quotientDigit: quotientDigit,
                     subtraction: subtraction,
@@ -820,7 +797,6 @@ private struct DivisionWork {
 
             stepDetails.append(
                 LongDivisionStep(
-                    consumedDigits: integerDigits.count + fractionalDigits,
                     workingValue: remainder,
                     quotientDigit: quotientDigit,
                     subtraction: subtraction,
@@ -843,25 +819,18 @@ private struct DivisionWork {
     private static func buildNotationLines(
         divisorText: String,
         dividendText: String,
-        quotientText: String,
-        steps: [String]
+        quotientText: String
     ) -> [String] {
         var lines: [String] = []
         let baseOffset = divisorText.count + 3
 
         lines.append(String(repeating: " ", count: baseOffset) + quotientText)
-        lines.append("\(divisorText) ) \(dividendText)")
-
-        // A compact textual guide under the long-division setup so each subtraction is visible.
-        for step in steps.prefix(3) {
-            lines.append("  \(step)")
-        }
+        lines.append("\(divisorText) ⟌ \(dividendText)")
 
         return lines
     }
 
     private struct LongDivisionStep {
-        let consumedDigits: Int
         let workingValue: Int
         let quotientDigit: Int
         let subtraction: Int
@@ -966,6 +935,28 @@ private enum ExplanationMath {
             output.removeLast()
         }
         return output
+    }
+
+    static func placeName(for index: Int, fractionDigits: Int) -> String {
+        let exponent = index - fractionDigits
+        switch exponent {
+        case 0:
+            return "ones"
+        case 1:
+            return "tens"
+        case 2:
+            return "hundreds"
+        case 3:
+            return "thousands"
+        case -1:
+            return "tenths"
+        case -2:
+            return "hundredths"
+        case -3:
+            return "thousandths"
+        default:
+            return "10^\(exponent) place"
+        }
     }
 }
 
